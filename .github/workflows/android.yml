@@ -3,7 +3,7 @@ name: Build & Release
 on:
   push:
     branches: [ main, ccr-cf10c2f3-u6vnmx ]
-    paths-ignore: [ 'design/**', '**.md' ]
+    paths-ignore: [ 'design/**', 'web/**', '**.md' ]
   workflow_dispatch:
 
 permissions:
