@@ -165,7 +165,7 @@ fun SettingsScreen(wide: Boolean) {
 
                 Group("Bản đồ") {
                     Item("Kiểu bản đồ", null, divider = false) {
-                        Seg(listOf("Tối", "Sáng"), if (dark) 0 else 1) { Prefs.setMapDark(it == 0) }
+                        Seg(listOf("Màu", "Tối"), if (dark) 1 else 0) { Prefs.setMapDark(it == 1) }
                     }
                 }
 

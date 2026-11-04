@@ -33,7 +33,10 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -49,8 +52,8 @@ data class GeoPoint(val latitude: Double, val longitude: Double)
 /** Bản đồ vector OpenFreeMap (dữ liệu OpenStreetMap), miễn phí, không cần khoá. */
 object MapStyles {
     const val DARK = "https://tiles.openfreemap.org/styles/dark"
-    const val LIGHT = "https://tiles.openfreemap.org/styles/positron"
-    const val FALLBACK = "https://tiles.openfreemap.org/styles/liberty"
+    const val COLOR = "https://tiles.openfreemap.org/styles/liberty"
+    const val FALLBACK = "https://tiles.openfreemap.org/styles/bright"
 }
 
 private val density get() = Resources.getSystem().displayMetrics.density
@@ -103,6 +106,59 @@ private fun addRideLayers(s: Style) {
             PropertyFactory.circleStrokeColor("#FFFFFF"), PropertyFactory.circleStrokeWidth(3f),
         )
     )
+}
+
+/** Tên địa điểm ưu tiên tiếng Việt (tên gốc OSM ở VN đã là tiếng Việt có dấu). */
+private fun vietnameseLabels(s: Style) {
+    val nameLayers = setOf(
+        "place", "transportation_name", "water_name", "poi", "aerodrome_label",
+        "mountain_peak", "park", "waterway", "aeroway",
+    )
+    val viName = Expression.coalesce(
+        Expression.get("name:vi"), Expression.get("name"), Expression.get("name:latin"), Expression.get("name_en"),
+    )
+    for (l in s.layers) {
+        if (l !is SymbolLayer) continue
+        val id = l.id
+        if (id.contains("shield") || id.contains("housenumber") || id.contains("ref")) continue
+        if (l.sourceLayer !in nameLayers) continue
+        try {
+            l.setProperties(PropertyFactory.textField(viName))
+        } catch (_: Exception) {
+        }
+    }
+}
+
+/** Kiểu tối gốc gần như đơn sắc: tô màu sông, cây xanh, đường lớn để nhìn xa vẫn phân biệt được. */
+private fun tintDark(s: Style) {
+    for (l in s.layers) {
+        val id = l.id
+        try {
+            when (l) {
+                is FillLayer -> when (l.sourceLayer) {
+                    "water" -> l.setProperties(PropertyFactory.fillColor("#1E4A63"))
+                    "park" -> l.setProperties(PropertyFactory.fillColor("#1E3B2A"))
+                    "landcover" -> l.setProperties(PropertyFactory.fillColor("#1D3527"))
+                    "building" -> l.setProperties(PropertyFactory.fillColor("#2E3138"))
+                }
+                is LineLayer -> when {
+                    l.sourceLayer == "waterway" -> l.setProperties(PropertyFactory.lineColor("#1E4A63"))
+                    l.sourceLayer == "transportation" && !id.contains("casing") && !id.contains("rail") -> when {
+                        id.contains("motorway") || id.contains("trunk") ->
+                            l.setProperties(PropertyFactory.lineColor("#C27B32"))
+                        id.contains("primary") ->
+                            l.setProperties(PropertyFactory.lineColor("#9C7A45"))
+                        id.contains("secondary") || id.contains("tertiary") ->
+                            l.setProperties(PropertyFactory.lineColor("#6E6A5E"))
+                    }
+                }
+                is SymbolLayer -> if (l.sourceLayer == "water_name") {
+                    l.setProperties(PropertyFactory.textColor("#7FB3D1"))
+                }
+            }
+        } catch (_: Exception) {
+        }
+    }
 }
 
 /**
@@ -170,14 +226,19 @@ fun RideMap(
         val m = map ?: return@LaunchedEffect
         style = null
         var triedFallback = false
-        val onLoaded = Style.OnStyleLoaded { s -> addRideLayers(s); style = s }
+        val onLoaded = Style.OnStyleLoaded { s ->
+            vietnameseLabels(s)
+            if (dark) tintDark(s)
+            addRideLayers(s)
+            style = s
+        }
         mapView.addOnDidFailLoadingMapListener {
             if (!triedFallback) {
                 triedFallback = true
                 m.setStyle(Style.Builder().fromUri(MapStyles.FALLBACK), onLoaded)
             }
         }
-        m.setStyle(Style.Builder().fromUri(if (dark) MapStyles.DARK else MapStyles.LIGHT), onLoaded)
+        m.setStyle(Style.Builder().fromUri(if (dark) MapStyles.DARK else MapStyles.COLOR), onLoaded)
     }
 
     LaunchedEffect(style, tracks, faded) {

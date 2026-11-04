@@ -1,9 +1,9 @@
-{ "version": "1.0.4", "date": "2026-11-04",
-  "new": [],
-  "improved": [
-    "Kiểm tra cập nhật nhanh và ổn định hơn, không bị giới hạn lượt hỏi",
-    "Thông báo cập nhật hiện rõ phiên bản đang dùng"
+{ "version": "1.0.5", "date": "2026-11-04",
+  "new": [
+    "Bản đồ màu đầy đủ (mặc định): sông xanh dương, công viên xanh lá, đường lớn màu cam"
   ],
-  "fixed": [
-    "Sửa lỗi bấm kiểm tra cập nhật nhưng không thấy bản mới"
-  ] }
+  "improved": [
+    "Tên đường, cầu, địa điểm hiện bằng tiếng Việt có dấu",
+    "Bản đồ tối có thêm màu cho sông, cây xanh và đường lớn, nhìn xa dễ nhận ra hơn"
+  ],
+  "fixed": [] }
