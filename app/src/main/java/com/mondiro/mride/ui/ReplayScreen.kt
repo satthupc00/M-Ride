@@ -197,7 +197,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             dot = if (ready) data!!.pos(t) else null,
             fitKey = data, bottomPadFrac = 0.30,
             follow = follow && ready,
-            bearing = if (rotate && follow && ready) camBearing else null,
+            bearing = if (rotate && ready) camBearing else null,
             onUserGesture = { follow = false },
         )
         TopFade()

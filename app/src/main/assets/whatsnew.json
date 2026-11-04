@@ -1,8 +1,9 @@
-{ "version": "1.0.8", "date": "2026-11-04",
-  "new": [
-    "Chia sẻ phát lại: bấm nút chia sẻ trong màn phát lại để gửi link cho bạn bè qua Zalo, Messenger…",
-    "Bạn bè mở link xem được bản đồ, đường đi, số liệu và tua lại như trong app, không cần cài gì",
-    "Link tự hết hạn và xoá sau 24 giờ"
+{ "version": "1.0.9", "date": "2026-11-04",
+  "new": [],
+  "improved": [
+    "Phát lại: zoom 2 ngón khi đang bám xe vẫn tiếp tục bám theo xe",
+    "Kéo bản đồ 1 ngón sẽ tự tắt bám xe, giữ nguyên chỗ đang xem",
+    "Tắt bám xe không còn lùi ra cả tuyến; bật lại thì giữ mức zoom đang dùng",
+    "Trang xem chia sẻ cho bạn bè cũng hoạt động giống như trên"
   ],
-  "improved": [],
   "fixed": [] }

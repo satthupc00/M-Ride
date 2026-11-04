@@ -235,7 +235,6 @@ function demo() {
   const pt = c => ({type: 'Feature', geometry: {type: 'Point', coordinates: c}, properties: {}});
   const ln = cs => ({type: 'Feature', geometry: {type: 'LineString', coordinates: cs}, properties: {}});
 
-  function fitAll() { const b = new maplibregl.LngLatBounds(coords[0], coords[0]); coords.forEach(c => b.extend(c)); map.fitBounds(b, {padding: camPad(), duration: 600, maxZoom: 17}); }
 
   map.on('load', () => {
     // nhãn tiếng Việt
@@ -260,15 +259,31 @@ function demo() {
     requestAnimationFrame(loop);
   });
 
-  // người xem tự kéo/zoom → tạm ngừng bám xe
-  map.on('movestart', e => { if (e.originalEvent && follow) { follow = false; paintChips(); } });
-  $('folBtn').onclick = () => {
-    follow = !follow; paintChips();
-    if (follow) { followLockUntil = performance.now() + 650; map.easeTo({center: pos(t), zoom: 16.5, padding: camPad(), duration: 600}); }
-    else { rotate = false; paintChips(); map.easeTo({bearing: 0, duration: 300}); fitAll(); }
+  // Zoom (2 ngón / lăn chuột) vẫn bám xe: phóng to quanh xe. Kéo 1 ngón / chuột → tắt bám xe, giữ nguyên khung nhìn.
+  map.scrollZoom.enable({around: 'center'});
+  map.touchZoomRotate.enable({around: 'center'});
+  map.touchZoomRotate.disableRotation();
+  // Theo dõi ngón tay/chuột: kéo 1 ngón > 6px → tắt bám xe. Khi đang chạm thì tạm dừng cập nhật camera
+  // để thao tác kéo/zoom không bị cắt ngang.
+  const cv = map.getCanvasContainer();
+  const pointers = new Map();
+  cv.addEventListener('pointerdown', e => { pointers.set(e.pointerId, {x: e.clientX, y: e.clientY}); });
+  cv.addEventListener('pointermove', e => {
+    const p0 = pointers.get(e.pointerId);
+    if (!p0 || pointers.size !== 1 || !follow) return;
+    if (Math.hypot(e.clientX - p0.x, e.clientY - p0.y) > 6) { follow = false; paintChips(); }
+  });
+  const lift = e => pointers.delete(e.pointerId);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => cv.addEventListener(ev, lift));
+  const flyToCar = () => {
+    followLockUntil = performance.now() + 650;
+    const z = map.getZoom() < 14 ? 16.5 : map.getZoom();
+    map.easeTo({center: pos(t), zoom: z, padding: camPad(), duration: 600});
   };
+  $('folBtn').onclick = () => { follow = !follow; paintChips(); if (follow) flyToCar(); };
   $('rotBtn').onclick = () => {
-    rotate = !rotate; if (rotate && !follow) { follow = true; followLockUntil = performance.now() + 650; map.easeTo({center: pos(t), zoom: 16.5, padding: camPad(), duration: 600}); }
+    rotate = !rotate;
+    if (rotate && !follow) { follow = true; flyToCar(); }
     if (!rotate) map.easeTo({bearing: 0, duration: 400});
     camB = map.getBearing(); paintChips();
   };
@@ -283,7 +298,7 @@ function demo() {
     const p = pos(t), i = idx(t);
     map.getSource('prog').setData(ln(coords.slice(0, i + 1).concat([p])));
     map.getSource('dot').setData(pt(p));
-    if (follow && now > followLockUntil) {
+    if (follow && now > followLockUntil && pointers.size === 0) {
       const opts = {center: p, padding: camPad()};
       if (rotate) { const h = heading(t); if (h != null) { const dl = ((h - camB + 540) % 360) - 180; camB = (camB + dl * 0.12 + 360) % 360; } opts.bearing = camB; }
       map.jumpTo(opts);

@@ -1,6 +1,7 @@
 package com.mondiro.mride.ui
 
 import android.content.res.Resources
+import android.graphics.PointF
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -30,7 +31,9 @@ import com.mondiro.mride.data.Prefs
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.gestures.MoveGestureDetector
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.gestures.MoveGestureDetector
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
@@ -226,9 +229,14 @@ fun RideMap(
             m.uiSettings.isAttributionEnabled = false
             m.setMaxZoomPreference(19.0)
             m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(10.7769, 106.7009), 13.0))
-            m.addOnCameraMoveStartedListener { reason ->
-                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) gestureCb?.invoke()
-            }
+            // Chỉ kéo bằng 1 ngón mới tắt bám xe; zoom 2 ngón vẫn giữ bám xe
+            m.addOnMoveListener(object : MapLibreMap.OnMoveListener {
+                override fun onMoveBegin(detector: MoveGestureDetector) {
+                    if (detector.pointersCount <= 1) gestureCb?.invoke()
+                }
+                override fun onMove(detector: MoveGestureDetector) {}
+                override fun onMoveEnd(detector: MoveGestureDetector) {}
+            })
             map = m
         }
     }
@@ -302,15 +310,21 @@ fun RideMap(
         if (follow) {
             val d = dot ?: return@LaunchedEffect
             val h = mapView.height.toDouble()
-            m.moveCamera(CameraUpdateFactory.paddingTo(0.0, 80.0 * density, 0.0, h * bottomPadFrac + 24.0 * density))
+            val top = 80.0 * density
+            val bottom = h * bottomPadFrac + 24.0 * density
+            m.moveCamera(CameraUpdateFactory.paddingTo(0.0, top, 0.0, bottom))
+            // zoom bằng 2 ngón sẽ phóng to quanh xe
+            m.uiSettings.focalPoint = PointF(mapView.width / 2f, (top + (h - top - bottom) / 2).toFloat())
             followAnimUntil = System.currentTimeMillis() + 800
-            m.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(d.latitude, d.longitude), 16.5), 750)
+            val z = m.cameraPosition.zoom.let { if (it < 14) 16.5 else it }
+            m.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(d.latitude, d.longitude), z), 750)
         } else {
-            m.moveCamera(CameraUpdateFactory.paddingTo(0.0, 0.0, 0.0, 0.0))
+            // tắt bám xe: giữ nguyên khung nhìn hiện tại, không lùi ra cả tuyến
+            m.uiSettings.focalPoint = null
         }
     }
 
-    LaunchedEffect(map, fitKey, fallbackCenter != null, follow) {
+    LaunchedEffect(map, fitKey, fallbackCenter != null) {
         val m = map ?: return@LaunchedEffect
         if (follow) return@LaunchedEffect
         val all = tracks.flatten()
