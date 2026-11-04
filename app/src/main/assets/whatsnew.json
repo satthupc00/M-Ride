@@ -1,7 +1,8 @@
-{ "version": "1.0.1", "date": "2026-11-04",
-  "new": [
-    "Icon mới của M Ride",
-    "Bật đồng bộ: đăng nhập Google trong Cài đặt để lưu hành trình lên mây"
+{ "version": "1.0.2", "date": "2026-11-04",
+  "new": [],
+  "improved": [
+    "Bản đồ tối dịu mắt hơn, hợp màu app"
   ],
-  "improved": [],
-  "fixed": [] }
+  "fixed": [
+    "Sửa lỗi bản đồ trắng trơn, hiện chữ \"API KEY REQUIRED\""
+  ] }

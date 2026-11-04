@@ -2,7 +2,14 @@ package com.mondiro.mride.ui
 
 import android.content.res.Resources
 import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -10,14 +17,17 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mondiro.mride.data.Prefs
-import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
@@ -27,10 +37,19 @@ import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.max
 
+/** Bản đồ OpenStreetMap (không cần khoá). Chế độ tối: đổi màu ảnh bản đồ sang xám tối. */
 object Tiles {
-    private fun urls(path: String) = arrayOf("a", "b", "c", "d").map { "https://$it.basemaps.cartocdn.com/$path/" }.toTypedArray()
-    val dark = XYTileSource("CartoDark", 1, 20, 256, "@2x.png", urls("dark_all"), "© OpenStreetMap contributors © CARTO")
-    val light = XYTileSource("CartoVoyager", 1, 20, 256, "@2x.png", urls("rastertiles/voyager"), "© OpenStreetMap contributors © CARTO")
+    private const val K = 0.69f
+    val darkFilter = ColorMatrixColorFilter(
+        ColorMatrix(
+            floatArrayOf(
+                -0.30f * K, -0.59f * K, -0.11f * K, 0f, 198f,
+                -0.30f * K, -0.59f * K, -0.11f * K, 0f, 202f,
+                -0.30f * K, -0.59f * K, -0.11f * K, 0f, 212f,
+                0f, 0f, 0f, 1f, 0f,
+            )
+        )
+    )
 }
 
 private val density get() = Resources.getSystem().displayMetrics.density
@@ -138,7 +157,9 @@ fun RideMap(
     }
 
     LaunchedEffect(dark) {
-        map.setTileSource(if (dark) Tiles.dark else Tiles.light)
+        map.setTileSource(TileSourceFactory.MAPNIK)
+        map.overlayManager.tilesOverlay.setColorFilter(if (dark) Tiles.darkFilter else null)
+        map.invalidate()
     }
 
     DisposableEffect(tracks, faded) {
@@ -179,5 +200,12 @@ fun RideMap(
         if (map.width > 0 && map.height > 0) doFit() else map.addOnFirstLayoutListener { _, _, _, _, _ -> doFit() }
     }
 
-    AndroidView(factory = { map }, modifier = modifier)
+    Box(modifier) {
+        AndroidView(factory = { map }, modifier = Modifier.fillMaxSize())
+        Text(
+            "© OpenStreetMap contributors",
+            fontSize = 9.sp, color = C.muted,
+            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 12.dp, top = 46.dp),
+        )
+    }
 }
