@@ -1,9 +1,11 @@
-{ "version": "1.0.9", "date": "2026-11-04",
-  "new": [],
-  "improved": [
-    "Phát lại: zoom 2 ngón khi đang bám xe vẫn tiếp tục bám theo xe",
-    "Kéo bản đồ 1 ngón sẽ tự tắt bám xe, giữ nguyên chỗ đang xem",
-    "Tắt bám xe không còn lùi ra cả tuyến; bật lại thì giữ mức zoom đang dùng",
-    "Trang xem chia sẻ cho bạn bè cũng hoạt động giống như trên"
+{ "version": "1.0.10", "date": "2026-11-04",
+  "new": [
+    "Phát lại: nút la bàn tròn để đưa bản đồ về hướng Bắc, tách riêng với nút \"Xoay theo xe\"",
+    "Xoay bản đồ tự do bằng 2 ngón (trên trang chia sẻ: giữ chuột phải rồi kéo)",
+    "Chạm vào một điểm trên đường đi để tua nhanh tới đó",
+    "Hiện giờ:phút ngay cạnh chấm xe đang chạy"
   ],
-  "fixed": [] }
+  "improved": [],
+  "fixed": [
+    "Sửa lỗi tắt xoay theo xe nhưng bản đồ không quay về hướng Bắc"
+  ] }

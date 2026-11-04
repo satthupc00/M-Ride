@@ -45,6 +45,11 @@ button:active{transform:scale(.95);transition-duration:.06s}
   background:rgba(31,33,38,.92);color:#fff;font-weight:600;font-size:12.5px;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .mchip.on{background:var(--red)}
 .mchip svg{width:16px;height:16px}
+.mchip.round{padding:0;width:40px;height:40px;justify-content:center}
+.mchip.round svg{width:22px;height:22px;transition:transform .15s linear}
+.tlabel{background:rgba(31,33,38,.92);color:#fff;font-weight:700;font-size:12px;padding:3px 8px;border-radius:10px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.tlabel.hover{background:#fff;color:#1F2126}
 .card{background:rgba(38,41,47,.97);border:1px solid var(--line);border-radius:16px;padding:12px 14px 14px;
   display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -92,6 +97,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radiu
 
 <div class="dock">
   <div class="chips">
+    <button class="mchip round" id="northBtn" title="Về hướng Bắc" aria-label="Về hướng Bắc"></button>
     <button class="mchip" id="rotBtn" title="Xoay bản đồ theo hướng xe"></button>
     <button class="mchip on" id="folBtn" title="Camera chạy theo xe"></button>
   </div>
@@ -122,6 +128,7 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="5" height="16" rx="1"/><rect x="13" y="4" width="5" height="16" rx="1"/></svg>',
   nav: f => `<svg viewBox="0 0 24 24" fill="${f ? '#fff' : 'none'}" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M3 11 22 2 13 21 11 13z"/></svg>`,
+  north: '<svg viewBox="0 0 24 24"><path d="M12 2 16 12H8z" fill="#E5383B"/><path d="M12 22 8 12h8z" fill="#fff"/></svg>',
   compass: f => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88z" fill="${f ? '#fff' : 'none'}"/></svg>`,
 };
 const $ = id => document.getElementById(id);
@@ -208,24 +215,24 @@ function demo() {
   $('expiry').textContent = `Link hết hạn lúc ${hm(d.expiresAt)} ${pad(new Date(d.expiresAt).getDate())}/${pad(new Date(d.expiresAt).getMonth()+1)}`;
 
   // trạng thái phát lại
-  let t = 0, playing = true, rate = 60, follow = true, rotate = false, camB = 0, followLockUntil = 0;
+  let t = 0, playing = true, rate = 60, follow = true, rotate = false, camB = 0, followLockUntil = 0, toNorth = false;
   const RATES = [1, 10, 30, 60, 120];
   $('rates').innerHTML = RATES.map(r => `<button class="rate${r === rate ? ' on' : ''}" data-r="${r}">${r}×</button>`).join('');
   $('rates').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; rate = +b.dataset.r; [...$('rates').children].forEach(x => x.classList.toggle('on', x === b)); };
   const paintChips = () => {
     $('folBtn').classList.toggle('on', follow); $('folBtn').innerHTML = ICON.nav(follow) + (follow ? 'Đang bám xe' : 'Bám theo xe');
-    $('rotBtn').classList.toggle('on', rotate); $('rotBtn').innerHTML = ICON.compass(rotate) + (rotate ? 'Xoay theo xe' : 'Hướng Bắc');
+    $('rotBtn').classList.toggle('on', rotate); $('rotBtn').innerHTML = ICON.compass(rotate) + 'Xoay theo xe';
     $('playBtn').innerHTML = playing ? ICON.pause : ICON.play;
   };
+  $('northBtn').innerHTML = ICON.north;
   paintChips();
 
   const plain = new URLSearchParams(location.search).get('style') === 'plain';
   const map = new maplibregl.Map({
     container: 'map', attributionControl: {compact: true},
     style: plain ? {version: 8, sources: {}, layers: [{id: 'bg', type: 'background', paint: {'background-color': '#E9E6DF'}}]} : STYLE,
-    center: coords[0], zoom: 14, dragRotate: false, pitchWithRotate: false, touchPitch: false,
+    center: coords[0], zoom: 14, dragRotate: true, pitchWithRotate: false, touchPitch: false, maxPitch: 0,
   });
-  map.touchZoomRotate.disableRotation();
 
   const bottomPad = () => (window.innerWidth >= 760 ? 40 : document.querySelector('.dock').offsetHeight + 10);
   const camPad = () => window.innerWidth >= 760
@@ -249,11 +256,14 @@ function demo() {
     map.addSource('dot', {type: 'geojson', data: pt(coords[0])});
     const lineLayout = {'line-cap': 'round', 'line-join': 'round'};
     map.addLayer({id: 'route', type: 'line', source: 'route', layout: lineLayout, paint: {'line-color': FADED, 'line-width': 5}});
+    map.addLayer({id: 'route-hit', type: 'line', source: 'route', layout: lineLayout, paint: {'line-color': '#000', 'line-width': 28, 'line-opacity': 0}});
     map.addLayer({id: 'prog-glow', type: 'line', source: 'prog', layout: lineLayout, paint: {'line-color': RED, 'line-width': 12, 'line-opacity': .22}});
     map.addLayer({id: 'prog', type: 'line', source: 'prog', layout: lineLayout, paint: {'line-color': RED, 'line-width': 5}});
     map.addLayer({id: 'start', type: 'circle', source: 'start', paint: {'circle-radius': 6, 'circle-color': '#1F2126', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
     map.addLayer({id: 'dot-halo', type: 'circle', source: 'dot', paint: {'circle-radius': 16, 'circle-color': RED, 'circle-opacity': .25}});
     map.addLayer({id: 'dot', type: 'circle', source: 'dot', paint: {'circle-radius': 7.5, 'circle-color': RED, 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
+    timeMarker.setLngLat(coords[0]).addTo(map);
+    if (id === 'demo') window.__mr = {map, coords}; // chỉ dùng để kiểm thử với dữ liệu mẫu
     $('state').hidden = true;
     map.jumpTo({center: coords[0], zoom: 16.5, padding: camPad()});
     requestAnimationFrame(loop);
@@ -262,15 +272,14 @@ function demo() {
   // Zoom (2 ngón / lăn chuột) vẫn bám xe: phóng to quanh xe. Kéo 1 ngón / chuột → tắt bám xe, giữ nguyên khung nhìn.
   map.scrollZoom.enable({around: 'center'});
   map.touchZoomRotate.enable({around: 'center'});
-  map.touchZoomRotate.disableRotation();
   // Theo dõi ngón tay/chuột: kéo 1 ngón > 6px → tắt bám xe. Khi đang chạm thì tạm dừng cập nhật camera
   // để thao tác kéo/zoom không bị cắt ngang.
   const cv = map.getCanvasContainer();
   const pointers = new Map();
-  cv.addEventListener('pointerdown', e => { pointers.set(e.pointerId, {x: e.clientX, y: e.clientY}); });
+  cv.addEventListener('pointerdown', e => { pointers.set(e.pointerId, {x: e.clientX, y: e.clientY, btn: e.button, ctrl: e.ctrlKey}); });
   cv.addEventListener('pointermove', e => {
     const p0 = pointers.get(e.pointerId);
-    if (!p0 || pointers.size !== 1 || !follow) return;
+    if (!p0 || pointers.size !== 1 || !follow || p0.btn !== 0 || p0.ctrl) return;
     if (Math.hypot(e.clientX - p0.x, e.clientY - p0.y) > 6) { follow = false; paintChips(); }
   });
   const lift = e => pointers.delete(e.pointerId);
@@ -282,11 +291,45 @@ function demo() {
   };
   $('folBtn').onclick = () => { follow = !follow; paintChips(); if (follow) flyToCar(); };
   $('rotBtn').onclick = () => {
-    rotate = !rotate;
+    rotate = !rotate; toNorth = false;
     if (rotate && !follow) { follow = true; flyToCar(); }
-    if (!rotate) map.easeTo({bearing: 0, duration: 400});
     camB = map.getBearing(); paintChips();
   };
+  // Về hướng Bắc: khi đang bám xe thì xoay dần trong vòng lặp (để không bị camera bám xe cắt ngang)
+  $('northBtn').onclick = () => {
+    rotate = false; paintChips();
+    if (follow) { camB = map.getBearing(); toNorth = true; }
+    else map.easeTo({bearing: 0, duration: 400});
+  };
+  // Xoay tự do bằng giữ chuột phải (hoặc 2 ngón trên điện thoại): tắt chế độ xoay theo xe
+  map.on('rotatestart', e => { if (e.originalEvent) { rotate = false; toNorth = false; paintChips(); } });
+  map.on('rotateend', () => { camB = map.getBearing(); });
+  map.on('rotate', () => { $('northBtn').firstChild.style.transform = `rotate(${-map.getBearing()}deg)`; });
+
+  // Bấm vào một điểm trên đường đi → tua tới đó; rê chuột → hiện giờ đi qua
+  const nearestIdx = pt0 => {
+    let best = -1, bd = 1e9;
+    for (let k = 0; k < n; k++) { const q = map.project(coords[k]); const dd = (q.x - pt0.x) ** 2 + (q.y - pt0.y) ** 2; if (dd < bd) { bd = dd; best = k; } }
+    return bd < 32 * 32 ? best : -1;
+  };
+  map.on('click', e => {
+    if (!map.queryRenderedFeatures(e.point, {layers: ['route-hit']}).length) return;
+    const k = nearestIdx(e.point); if (k < 0) return;
+    t = vt[k];
+    if (follow) followLockUntil = 0;
+  });
+  const tlEl = document.createElement('div'); tlEl.className = 'tlabel';
+  const timeMarker = new maplibregl.Marker({element: tlEl, anchor: 'bottom', offset: [0, -16]});
+  const hoverEl = document.createElement('div'); hoverEl.className = 'tlabel hover';
+  const hoverMarker = new maplibregl.Marker({element: hoverEl, anchor: 'bottom', offset: [0, -12]});
+  let hoverOn = false;
+  map.on('mousemove', 'route-hit', e => {
+    map.getCanvas().style.cursor = 'pointer';
+    const k = nearestIdx(e.point); if (k < 0) return;
+    hoverEl.textContent = hm(clock(vt[k]));
+    hoverMarker.setLngLat(coords[k]); if (!hoverOn) { hoverMarker.addTo(map); hoverOn = true; }
+  });
+  map.on('mouseleave', 'route-hit', () => { map.getCanvas().style.cursor = ''; hoverMarker.remove(); hoverOn = false; });
   $('playBtn').onclick = () => { if (t >= total) t = 0; playing = !playing; paintChips(); };
   const scrub = $('scrub');
   scrub.oninput = () => { t = scrub.value / 1000 * total; };
@@ -301,8 +344,10 @@ function demo() {
     if (follow && now > followLockUntil && pointers.size === 0) {
       const opts = {center: p, padding: camPad()};
       if (rotate) { const h = heading(t); if (h != null) { const dl = ((h - camB + 540) % 360) - 180; camB = (camB + dl * 0.12 + 360) % 360; } opts.bearing = camB; }
+      else if (toNorth) { const dl = ((0 - camB + 540) % 360) - 180; camB = Math.abs(dl) < 0.5 ? 0 : (camB + dl * 0.15 + 360) % 360; if (camB === 0) toNorth = false; opts.bearing = camB; }
       map.jumpTo(opts);
     }
+    timeMarker.setLngLat(p); tlEl.textContent = hm(clock(t));
     $('clock').textContent = hms(clock(t));
     $('spd').textContent = Math.round(speed(t));
     if (document.activeElement !== scrub) scrub.value = total ? t / total * 1000 : 0;

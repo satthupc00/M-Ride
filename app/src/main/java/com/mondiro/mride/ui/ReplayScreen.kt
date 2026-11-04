@@ -111,6 +111,8 @@ class ReplayData(val pts: List<TrackPoint>) {
         return (Math.toDegrees(Math.atan2(dLon, dLat)) + 360) % 360
     }
 
+    fun timeAt(i: Int): Double = vt[i.coerceIn(0, pts.size - 1)]
+
     fun progress(t: Double): List<GeoPoint> {
         val i = idx(t)
         val out = ArrayList<GeoPoint>(i + 2)
@@ -154,6 +156,9 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var follow by remember(sel) { mutableStateOf(true) }
     var rotate by remember { mutableStateOf(false) }
     var camBearing by remember(sel) { mutableDoubleStateOf(0.0) }
+    var northAnim by remember { mutableStateOf(false) }
+    var northTick by remember { mutableIntStateOf(0) }
+    val cam = remember { MapCam() }
     val data = loaded?.second
 
     LaunchedEffect(playing, rate, data) {
@@ -173,17 +178,21 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
         }
     }
 
-    // Làm mượt góc xoay bản đồ theo hướng xe
-    LaunchedEffect(rotate, follow, data) {
+    // Làm mượt góc xoay: theo hướng xe, hoặc xoay dần về hướng Bắc
+    LaunchedEffect(rotate, follow, northAnim, data) {
         val d = data ?: return@LaunchedEffect
-        if (!rotate || !follow || d.pts.size < 2) return@LaunchedEffect
-        d.heading(t)?.let { camBearing = it }
+        if (!follow || (!rotate && !northAnim) || d.pts.size < 2) return@LaunchedEffect
+        camBearing = cam.bearing
         while (isActive) {
             withFrameNanos { }
-            val target = d.heading(t) ?: continue
-            var delta = (target - camBearing + 540) % 360 - 180
-            if (Math.abs(delta) < 0.3) delta = 0.0
-            camBearing = (camBearing + delta * 0.12 + 360) % 360
+            val target = if (rotate) d.heading(t) ?: continue else 0.0
+            val delta = (target - camBearing + 540) % 360 - 180
+            if (!rotate && Math.abs(delta) < 0.5) {
+                camBearing = 0.0
+                northAnim = false
+                break
+            }
+            camBearing = (camBearing + delta * (if (rotate) 0.12 else 0.15) + 360) % 360
         }
     }
 
@@ -197,7 +206,12 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             dot = if (ready) data!!.pos(t) else null,
             fitKey = data, bottomPadFrac = 0.30,
             follow = follow && ready,
-            bearing = if (rotate && ready) camBearing else null,
+            bearing = if ((rotate || northAnim) && ready) camBearing else null,
+            dotLabel = if (ready) Fmt.hm(data!!.clock(t)) else null,
+            onRouteTap = { k -> data?.let { t = it.timeAt(k) } },
+            onUserRotate = { rotate = false; northAnim = false },
+            cam = cam,
+            northTick = northTick,
             onUserGesture = { follow = false },
         )
         TopFade()
@@ -257,11 +271,22 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                     Modifier.align(Alignment.End).padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val round = CircleShape
+                    Box(
+                        Modifier.size(40.dp).pressable(round) {
+                            rotate = false
+                            if (follow) northAnim = true else northTick++
+                        }.background(C.chrome.copy(alpha = .92f), round),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(R.drawable.ic_north), "Về hướng Bắc", Modifier.size(22.dp), tint = Color.Unspecified)
+                    }
                     MapChip(
-                        if (rotate) "Xoay theo xe" else "Hướng Bắc",
+                        "Xoay theo xe",
                         if (rotate) R.drawable.ic_compass_on else R.drawable.ic_compass, rotate,
                     ) {
                         rotate = !rotate
+                        northAnim = false
                         if (rotate) follow = true
                     }
                     MapChip(

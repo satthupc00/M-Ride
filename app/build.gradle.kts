@@ -20,8 +20,8 @@ android {
         applicationId = "com.mondiro.mride"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.9"
+        versionCode = 11
+        versionName = "1.0.10"
     }
 
     // Khoá ký app lấy từ GitHub Secrets (KEYSTORE_BASE64 / KEYSTORE_PASSWORD), không nằm trong repo

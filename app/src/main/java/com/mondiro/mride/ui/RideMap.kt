@@ -32,6 +32,7 @@ import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.gestures.MoveGestureDetector
+import org.maplibre.android.gestures.RotateGestureDetector
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
@@ -50,6 +51,9 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+
+/** Góc xoay hiện tại của bản đồ (cập nhật liên tục, không gây vẽ lại giao diện). */
+class MapCam { var bearing: Double = 0.0 }
 
 /** Toạ độ đơn giản dùng chung trong app. */
 data class GeoPoint(val latitude: Double, val longitude: Double)
@@ -70,9 +74,11 @@ private fun emptyFc(): FeatureCollection = FeatureCollection.fromFeatures(ArrayL
 private fun lineOf(pts: List<GeoPoint>) =
     LineString.fromLngLats(pts.map { Point.fromLngLat(it.longitude, it.latitude) })
 
-private fun pointFc(p: GeoPoint?): FeatureCollection =
+private fun pointFc(p: GeoPoint?, label: String? = null): FeatureCollection =
     if (p == null) emptyFc()
-    else FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(Point.fromLngLat(p.longitude, p.latitude))))
+    else FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(Point.fromLngLat(p.longitude, p.latitude)).also {
+        if (label != null) it.addStringProperty("label", label)
+    }))
 
 private fun addRideLayers(s: Style) {
     for (id in listOf("tracks", "progress", "start", "dot")) s.addSource(GeoJsonSource(id, emptyFc()))
@@ -109,6 +115,19 @@ private fun addRideLayers(s: Style) {
         CircleLayer("dot-c", "dot").withProperties(
             PropertyFactory.circleRadius(7f), PropertyFactory.circleColor(RED),
             PropertyFactory.circleStrokeColor("#FFFFFF"), PropertyFactory.circleStrokeWidth(3f),
+        )
+    )
+    s.addLayer(
+        SymbolLayer("dot-label", "dot").withProperties(
+            PropertyFactory.textField(Expression.get("label")),
+            PropertyFactory.textFont(arrayOf("Noto Sans Bold")),
+            PropertyFactory.textSize(12.5f),
+            PropertyFactory.textColor("#FFFFFF"),
+            PropertyFactory.textHaloColor("#1F2126"),
+            PropertyFactory.textHaloWidth(2.4f),
+            PropertyFactory.textOffset(arrayOf(0f, -2.0f)),
+            PropertyFactory.textAllowOverlap(true),
+            PropertyFactory.textIgnorePlacement(true),
         )
     )
 }
@@ -182,9 +201,18 @@ fun RideMap(
     follow: Boolean = false,
     bearing: Double? = null,
     onUserGesture: (() -> Unit)? = null,
+    dotLabel: String? = null,
+    onRouteTap: ((Int) -> Unit)? = null,
+    onUserRotate: (() -> Unit)? = null,
+    cam: MapCam? = null,
+    northTick: Int = 0,
 ) {
     val ctx = LocalContext.current
     val gestureCb by rememberUpdatedState(onUserGesture)
+    val tapCb by rememberUpdatedState(onRouteTap)
+    val rotateCb by rememberUpdatedState(onUserRotate)
+    val camRef by rememberUpdatedState(cam)
+    val tracksRef by rememberUpdatedState(tracks)
     var followAnimUntil by remember { mutableLongStateOf(0L) }
     val dark by Prefs.mapDark.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -236,6 +264,28 @@ fun RideMap(
                 override fun onMove(detector: MoveGestureDetector) {}
                 override fun onMoveEnd(detector: MoveGestureDetector) {}
             })
+            // Xoay tự do bằng 2 ngón → tắt chế độ xoay theo xe
+            m.addOnRotateListener(object : MapLibreMap.OnRotateListener {
+                override fun onRotateBegin(detector: RotateGestureDetector) { rotateCb?.invoke() }
+                override fun onRotate(detector: RotateGestureDetector) {}
+                override fun onRotateEnd(detector: RotateGestureDetector) {}
+            })
+            m.addOnCameraMoveListener { camRef?.bearing = m.cameraPosition.bearing }
+            // Chạm vào đường đi → báo vị trí điểm gần nhất để tua tới đó
+            m.addOnMapClickListener { ll ->
+                val cb = tapCb ?: return@addOnMapClickListener false
+                val pts = tracksRef.firstOrNull() ?: return@addOnMapClickListener false
+                val tap = m.projection.toScreenLocation(ll)
+                var best = -1
+                var bd = Float.MAX_VALUE
+                pts.forEachIndexed { k, g ->
+                    val q = m.projection.toScreenLocation(LatLng(g.latitude, g.longitude))
+                    val dd = (q.x - tap.x) * (q.x - tap.x) + (q.y - tap.y) * (q.y - tap.y)
+                    if (dd < bd) { bd = dd; best = k }
+                }
+                val lim = 30 * density
+                if (best >= 0 && bd < lim * lim) { cb(best); true } else false
+            }
             map = m
         }
     }
@@ -277,7 +327,7 @@ fun RideMap(
             if (p != null && p.size >= 2) FeatureCollection.fromFeatures(listOf(Feature.fromGeometry(lineOf(p))))
             else emptyFc()
         )
-        s.getSourceAs<GeoJsonSource>("dot")?.setGeoJson(pointFc(dot))
+        s.getSourceAs<GeoJsonSource>("dot")?.setGeoJson(pointFc(dot, dotLabel))
         // Bám theo xe: camera chạy theo chấm đỏ mỗi khung hình
         val m = map
         if (follow && m != null && dot != null && System.currentTimeMillis() > followAnimUntil) {
@@ -295,12 +345,15 @@ fun RideMap(
         }
     }
 
-    // Tắt xoay → đưa bản đồ về hướng Bắc
-    LaunchedEffect(map, bearing == null) {
+    // Xoay 2 ngón chỉ bật ở màn phát lại
+    LaunchedEffect(map, onUserRotate != null) {
+        map?.uiSettings?.isRotateGesturesEnabled = onUserRotate != null
+    }
+
+    // Về hướng Bắc khi không bám xe (khi bám xe thì màn phát lại tự xoay dần qua tham số bearing)
+    LaunchedEffect(map, northTick) {
         val m = map ?: return@LaunchedEffect
-        if (bearing == null && m.cameraPosition.bearing != 0.0) {
-            m.animateCamera(CameraUpdateFactory.bearingTo(0.0), 400)
-        }
+        if (northTick > 0 && !follow) m.animateCamera(CameraUpdateFactory.bearingTo(0.0), 400)
     }
 
     // Bật bám xe: chừa chỗ cho bảng điều khiển phía dưới rồi phóng to mượt vào xe
