@@ -1,5 +1,7 @@
 package com.mondiro.mride.ui
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -148,6 +150,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var playing by remember(sel) { mutableStateOf(true) }
     var rate by remember { mutableIntStateOf(60) }
     var askDelete by remember { mutableStateOf(false) }
+    var sharing by remember { mutableStateOf(false) }
     var follow by remember(sel) { mutableStateOf(true) }
     var rotate by remember { mutableStateOf(false) }
     var camBearing by remember(sel) { mutableDoubleStateOf(0.0) }
@@ -209,6 +212,30 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                     ) {
                         Icon(painterResource(R.drawable.ic_back), null, Modifier.size(15.dp), tint = C.text)
                         Text(" Hành trình", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = C.text)
+                    }
+                }
+                if (ready) {
+                    IconBtn(R.drawable.ic_share, "Chia sẻ hành trình") {
+                        if (sharing) return@IconBtn
+                        val trips = loaded?.first ?: return@IconBtn
+                        val pts = data?.pts ?: return@IconBtn
+                        sharing = true
+                        Toast.makeText(ctx, "Đang tạo link chia sẻ…", Toast.LENGTH_SHORT).show()
+                        scope.launch {
+                            try {
+                                val title = if (trips.size == 1) trips[0].name else "Cả ngày · " + Fmt.day(trips.first().startTime)
+                                val url = Sync.share(trips, pts, title)
+                                val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                                    .putExtra(Intent.EXTRA_TEXT, "Xem lại hành trình của mình trên M Ride (link có hạn 24 giờ): $url")
+                                ctx.startActivity(Intent.createChooser(send, "Chia sẻ hành trình"))
+                            } catch (e: IllegalStateException) {
+                                Toast.makeText(ctx, e.message ?: "Không chia sẻ được", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(ctx, "Không tạo được link, kiểm tra kết nối mạng", Toast.LENGTH_LONG).show()
+                            } finally {
+                                sharing = false
+                            }
+                        }
                     }
                 }
                 if (sel.ids.size == 1 && loaded?.first?.firstOrNull()?.active == false) {

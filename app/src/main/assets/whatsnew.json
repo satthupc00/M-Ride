@@ -1,8 +1,8 @@
-{ "version": "1.0.7", "date": "2026-11-04",
+{ "version": "1.0.8", "date": "2026-11-04",
   "new": [
-    "Phát lại: nút \"Xoay theo xe\" — bản đồ xoay theo hướng xe chạy, đầu xe luôn hướng lên trên"
+    "Chia sẻ phát lại: bấm nút chia sẻ trong màn phát lại để gửi link cho bạn bè qua Zalo, Messenger…",
+    "Bạn bè mở link xem được bản đồ, đường đi, số liệu và tua lại như trong app, không cần cài gì",
+    "Link tự hết hạn và xoá sau 24 giờ"
   ],
-  "improved": [
-    "Góc xoay được làm mượt, không giật khi xe rẽ hay khi tua nhanh"
-  ],
+  "improved": [],
   "fixed": [] }

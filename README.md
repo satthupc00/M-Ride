@@ -30,6 +30,13 @@ Nếu thiếu 2 secret này, Actions chỉ build thử chứ không tạo bản 
        match /users/{uid}/{doc=**} {
          allow read, write: if request.auth != null && request.auth.uid == uid;
        }
+       // Link chia sẻ phát lại: ai có link đều xem được, hết 24 giờ thì không xem được nữa
+       match /shares/{id} {
+         allow get: if resource.data.expiresAt > request.time;
+         allow list: if request.auth != null && resource.data.owner == request.auth.uid;
+         allow create: if request.auth != null && request.resource.data.owner == request.auth.uid;
+         allow delete: if request.auth != null && resource.data.owner == request.auth.uid;
+       }
      }
    }
    ```
@@ -37,3 +44,8 @@ Nếu thiếu 2 secret này, Actions chỉ build thử chứ không tạo bản 
    - Package name: `com.mondiro.mride`
    - SHA-1: `AA:EF:13:D2:19:02:6B:B9:F2:C8:3F:72:BE:37:0C:58:9D:8D:CA:B3`
    - Bấm Register → tải file **google-services.json** → bỏ vào thư mục `app/` của repo (hoặc gửi cho Claude).
+
+## Chia sẻ phát lại (link 24 giờ)
+- Trang xem nằm ở `web/share/`, tự đưa lên GitHub Pages: `https://satthupc00.github.io/M-Ride/share/?id=...`
+- Bật một lần: repo **Settings → Pages → Source: GitHub Actions**.
+- Tự xoá dữ liệu sau 24 giờ: Firebase Console → **Firestore Database → tab TTL** (hoặc "Time-to-live") → **Create policy** → Collection group: `shares`, Timestamp field: `expiresAt` → Save.

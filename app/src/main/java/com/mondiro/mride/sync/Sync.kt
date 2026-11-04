@@ -11,6 +11,7 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseApp
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.DocumentSnapshot
@@ -92,9 +93,59 @@ object Sync {
             }
             status.value = Status.Synced
             lastSync.value = System.currentTimeMillis()
+            cleanupShares(user.uid)
         } catch (e: Exception) {
             Log.w(TAG, "sync", e)
             status.value = Status.Error
+        }
+    }
+
+    const val SHARE_BASE = "https://satthupc00.github.io/M-Ride/share/?id="
+
+    /**
+     * Tạo link chia sẻ phát lại, tự hết hạn sau 24 giờ.
+     * Trả về link, hoặc ném lỗi kèm câu báo cho người dùng.
+     */
+    suspend fun share(trips: List<Trip>, pts: List<TrackPoint>, title: String): String {
+        if (!available()) throw IllegalStateException("Đồng bộ chưa được thiết lập")
+        val user = FirebaseAuth.getInstance().currentUser
+            ?: throw IllegalStateException("Đăng nhập trong Cài đặt để chia sẻ")
+        if (pts.size < 2 || trips.isEmpty()) throw IllegalStateException("Chuyến này chưa đủ dữ liệu")
+        val start = pts.first().time
+        val end = pts.last().time
+        val id = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        val now = System.currentTimeMillis()
+        val doc = mapOf(
+            "owner" to user.uid,
+            "name" to (if (trips.size == 1) trips[0].name.ifBlank { "Chuyến đi" } else title),
+            "start" to start,
+            "end" to end,
+            "dist" to trips.sumOf { it.distanceM },
+            "max" to (trips.maxOfOrNull { it.maxSpeedKmh } ?: 0.0),
+            "poly" to Geo.encode(pts.map { it.lat to it.lon }),
+            "ts" to pts.joinToString(",") { ((it.time - start) / 1000).toString() },
+            "sp" to pts.joinToString(",") { it.speedKmh.roundToInt().toString() },
+            "createdAt" to Timestamp(java.util.Date(now)),
+            "expiresAt" to Timestamp(java.util.Date(now + 24 * 3600_000L)),
+        )
+        withTimeout(30_000) {
+            FirebaseFirestore.getInstance().collection("shares").document(id).set(doc).await()
+        }
+        return SHARE_BASE + id
+    }
+
+    /** Xoá các link chia sẻ đã quá 24 giờ của mình (dự phòng cho chế độ tự xoá trên mây). */
+    private suspend fun cleanupShares(uid: String) {
+        try {
+            val snap = FirebaseFirestore.getInstance().collection("shares")
+                .whereEqualTo("owner", uid).get(Source.SERVER).await()
+            val now = System.currentTimeMillis()
+            for (d in snap.documents) {
+                val exp = d.getTimestamp("expiresAt")?.toDate()?.time ?: 0L
+                if (exp < now) d.reference.delete()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "cleanupShares", e)
         }
     }
 
