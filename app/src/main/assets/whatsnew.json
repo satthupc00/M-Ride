@@ -1,9 +1,9 @@
-{ "version": "1.0.5", "date": "2026-11-04",
+{ "version": "1.0.6", "date": "2026-11-04",
   "new": [
-    "Bản đồ màu đầy đủ (mặc định): sông xanh dương, công viên xanh lá, đường lớn màu cam"
+    "Phát lại: tự phóng to vào xe và camera chạy theo xe suốt hành trình",
+    "Nút \"Bám theo xe\" để bật/tắt; tắt thì bản đồ lùi ra xem cả tuyến"
   ],
   "improved": [
-    "Tên đường, cầu, địa điểm hiện bằng tiếng Việt có dấu",
-    "Bản đồ tối có thêm màu cho sông, cây xanh và đường lớn, nhìn xa dễ nhận ra hơn"
+    "Tự kéo hoặc zoom bản đồ khi đang phát lại sẽ tạm ngừng bám xe để xem thoải mái"
   ],
   "fixed": [] }

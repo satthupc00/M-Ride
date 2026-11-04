@@ -12,7 +12,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -174,8 +176,12 @@ fun RideMap(
     fitKey: Any? = null,
     fallbackCenter: GeoPoint? = null,
     bottomPadFrac: Double = 0.0,
+    follow: Boolean = false,
+    onUserGesture: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
+    val gestureCb by rememberUpdatedState(onUserGesture)
+    var followAnimUntil by remember { mutableLongStateOf(0L) }
     val dark by Prefs.mapDark.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapView = remember {
@@ -218,6 +224,9 @@ fun RideMap(
             m.uiSettings.isAttributionEnabled = false
             m.setMaxZoomPreference(19.0)
             m.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(10.7769, 106.7009), 13.0))
+            m.addOnCameraMoveStartedListener { reason ->
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) gestureCb?.invoke()
+            }
             map = m
         }
     }
@@ -260,10 +269,30 @@ fun RideMap(
             else emptyFc()
         )
         s.getSourceAs<GeoJsonSource>("dot")?.setGeoJson(pointFc(dot))
+        // Bám theo xe: camera chạy theo chấm đỏ mỗi khung hình
+        val m = map
+        if (follow && m != null && dot != null && System.currentTimeMillis() > followAnimUntil) {
+            m.moveCamera(CameraUpdateFactory.newLatLng(LatLng(dot.latitude, dot.longitude)))
+        }
     }
 
-    LaunchedEffect(map, fitKey, fallbackCenter != null) {
+    // Bật bám xe: chừa chỗ cho bảng điều khiển phía dưới rồi phóng to mượt vào xe
+    LaunchedEffect(map, follow, dot != null) {
         val m = map ?: return@LaunchedEffect
+        if (follow) {
+            val d = dot ?: return@LaunchedEffect
+            val h = mapView.height.toDouble()
+            m.moveCamera(CameraUpdateFactory.paddingTo(0.0, 80.0 * density, 0.0, h * bottomPadFrac + 24.0 * density))
+            followAnimUntil = System.currentTimeMillis() + 800
+            m.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(d.latitude, d.longitude), 16.5), 750)
+        } else {
+            m.moveCamera(CameraUpdateFactory.paddingTo(0.0, 0.0, 0.0, 0.0))
+        }
+    }
+
+    LaunchedEffect(map, fitKey, fallbackCenter != null, follow) {
+        val m = map ?: return@LaunchedEffect
+        if (follow) return@LaunchedEffect
         val all = tracks.flatten()
         mapView.post {
             val h = mapView.height

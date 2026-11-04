@@ -123,6 +123,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var playing by remember(sel) { mutableStateOf(true) }
     var rate by remember { mutableIntStateOf(60) }
     var askDelete by remember { mutableStateOf(false) }
+    var follow by remember(sel) { mutableStateOf(true) }
     val data = loaded?.second
 
     LaunchedEffect(playing, rate, data) {
@@ -150,7 +151,9 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             Modifier.fillMaxSize(), tracks, faded = true,
             progress = if (ready) data!!.progress(t) else null,
             dot = if (ready) data!!.pos(t) else null,
-            fitKey = data, bottomPadFrac = if (compact) 0.30 else 0.30,
+            fitKey = data, bottomPadFrac = 0.30,
+            follow = follow && ready,
+            onUserGesture = { follow = false },
         )
         TopFade()
         TopBar {
@@ -180,6 +183,26 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
         }
 
         Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)) {
+            if (ready) {
+                val shape = RoundedCornerShape(24.dp)
+                Row(
+                    Modifier.align(Alignment.End).padding(bottom = 8.dp)
+                        .pressable(shape) { follow = !follow }
+                        .background(if (follow) C.red else C.chrome.copy(alpha = .92f), shape)
+                        .padding(start = 12.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Icon(
+                        painterResource(if (follow) R.drawable.ic_navigation_on else R.drawable.ic_navigation),
+                        null, Modifier.size(16.dp), tint = Color.White,
+                    )
+                    Text(
+                        if (follow) "Đang bám xe" else "Bám theo xe",
+                        fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White,
+                    )
+                }
+            }
             Card {
                 Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
