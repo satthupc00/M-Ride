@@ -10,8 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import org.osmdroid.config.Configuration
-import java.io.File
+import org.maplibre.android.MapLibre
 
 class MRideApp : Application() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -20,11 +19,7 @@ class MRideApp : Application() {
         super.onCreate()
         Prefs.init(this)
         Notifs.createChannels(this)
-        Configuration.getInstance().apply {
-            userAgentValue = "MRide/${BuildConfig.VERSION_NAME} (com.mondiro.mride)"
-            osmdroidBasePath = File(filesDir, "osmdroid")
-            osmdroidTileCache = File(cacheDir, "osmdroid/tiles")
-        }
+        MapLibre.getInstance(this)
         Sync.init(this)
         AutoDetect.register(this)
         scope.launch { TripFinisher.finalizeStale(this@MRideApp) }

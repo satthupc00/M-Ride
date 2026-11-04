@@ -43,7 +43,6 @@ import com.mondiro.mride.tracking.Tracker
 import com.mondiro.mride.tracking.TrackingService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
-import org.osmdroid.util.GeoPoint
 
 data class DayStats(val dist: Double, val durMs: Long, val maxKmh: Double) {
     val avgKmh: Double get() = if (durMs > 0) (dist / 1000.0) / (durMs / 3_600_000.0) else 0.0
@@ -125,7 +124,7 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
         Box(Modifier.fillMaxSize()) {
             RideMap(
                 Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size,
-                fallbackCenter = fallback, bottomInsetFrac = 1.1,
+                fallbackCenter = fallback, bottomPadFrac = 0.34,
             )
             TopFade()
             Column(Modifier.fillMaxWidth()) {

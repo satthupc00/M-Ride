@@ -1,8 +1,9 @@
-{ "version": "1.0.2", "date": "2026-11-04",
+{ "version": "1.0.3", "date": "2026-11-04",
   "new": [],
   "improved": [
-    "Bản đồ tối dịu mắt hơn, hợp màu app"
+    "Bản đồ mới dạng vector: tải nhanh, nét ở mọi mức zoom, kéo và phóng to mượt hơn",
+    "Bản đồ tối thật sự, dịu mắt khi đi đêm"
   ],
   "fixed": [
-    "Sửa lỗi bản đồ trắng trơn, hiện chữ \"API KEY REQUIRED\""
+    "Sửa lỗi bản đồ tải rất chậm, bị ô xám và ô vỡ"
   ] }

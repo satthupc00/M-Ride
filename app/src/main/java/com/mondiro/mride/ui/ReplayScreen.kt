@@ -45,7 +45,6 @@ import com.mondiro.mride.data.Trip
 import com.mondiro.mride.sync.Sync
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.osmdroid.util.GeoPoint
 
 /** Dòng thời gian ảo: các khoảng nghỉ dài giữa 2 chuyến được rút còn 2 giây. */
 class ReplayData(val pts: List<TrackPoint>) {
@@ -151,7 +150,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             Modifier.fillMaxSize(), tracks, faded = true,
             progress = if (ready) data!!.progress(t) else null,
             dot = if (ready) data!!.pos(t) else null,
-            fitKey = data, bottomInsetFrac = if (compact) 0.9 else 0.6,
+            fitKey = data, bottomPadFrac = if (compact) 0.30 else 0.30,
         )
         TopFade()
         TopBar {
