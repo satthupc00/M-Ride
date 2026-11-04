@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.mondiro.mride.data.Prefs
 import org.maplibre.android.MapLibre
+import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
@@ -177,6 +178,7 @@ fun RideMap(
     fallbackCenter: GeoPoint? = null,
     bottomPadFrac: Double = 0.0,
     follow: Boolean = false,
+    bearing: Double? = null,
     onUserGesture: (() -> Unit)? = null,
 ) {
     val ctx = LocalContext.current
@@ -272,7 +274,25 @@ fun RideMap(
         // Bám theo xe: camera chạy theo chấm đỏ mỗi khung hình
         val m = map
         if (follow && m != null && dot != null && System.currentTimeMillis() > followAnimUntil) {
-            m.moveCamera(CameraUpdateFactory.newLatLng(LatLng(dot.latitude, dot.longitude)))
+            val target = LatLng(dot.latitude, dot.longitude)
+            if (bearing != null) {
+                // Xoay bản đồ theo hướng xe: đầu xe luôn hướng lên trên
+                m.moveCamera(
+                    CameraUpdateFactory.newCameraPosition(
+                        CameraPosition.Builder(m.cameraPosition).target(target).bearing(bearing).build()
+                    )
+                )
+            } else {
+                m.moveCamera(CameraUpdateFactory.newLatLng(target))
+            }
+        }
+    }
+
+    // Tắt xoay → đưa bản đồ về hướng Bắc
+    LaunchedEffect(map, bearing == null) {
+        val m = map ?: return@LaunchedEffect
+        if (bearing == null && m.cameraPosition.bearing != 0.0) {
+            m.animateCamera(CameraUpdateFactory.bearingTo(0.0), 400)
         }
     }
 

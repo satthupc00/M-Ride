@@ -1,9 +1,8 @@
-{ "version": "1.0.6", "date": "2026-11-04",
+{ "version": "1.0.7", "date": "2026-11-04",
   "new": [
-    "Phát lại: tự phóng to vào xe và camera chạy theo xe suốt hành trình",
-    "Nút \"Bám theo xe\" để bật/tắt; tắt thì bản đồ lùi ra xem cả tuyến"
+    "Phát lại: nút \"Xoay theo xe\" — bản đồ xoay theo hướng xe chạy, đầu xe luôn hướng lên trên"
   ],
   "improved": [
-    "Tự kéo hoặc zoom bản đồ khi đang phát lại sẽ tạm ngừng bám xe để xem thoải mái"
+    "Góc xoay được làm mượt, không giật khi xe rẽ hay khi tua nhanh"
   ],
   "fixed": [] }

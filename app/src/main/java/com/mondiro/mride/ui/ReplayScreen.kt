@@ -99,6 +99,16 @@ class ReplayData(val pts: List<TrackPoint>) {
         return pts[i].speedKmh + (pts[i + 1].speedKmh - pts[i].speedKmh) * f
     }
 
+    /** Hướng đi (độ, 0 = Bắc) nhìn trước ~10 giây để mượt, null nếu gần như đứng yên. */
+    fun heading(t: Double): Double? {
+        val a = pos(t)
+        val b = pos((t + 10).coerceAtMost(total))
+        val dLat = b.latitude - a.latitude
+        val dLon = (b.longitude - a.longitude) * Math.cos(Math.toRadians(a.latitude))
+        if (Math.hypot(dLat, dLon) < 0.00003) return null // < ~3 m
+        return (Math.toDegrees(Math.atan2(dLon, dLat)) + 360) % 360
+    }
+
     fun progress(t: Double): List<GeoPoint> {
         val i = idx(t)
         val out = ArrayList<GeoPoint>(i + 2)
@@ -109,6 +119,21 @@ class ReplayData(val pts: List<TrackPoint>) {
 }
 
 private val RATES = listOf(1, 10, 30, 60, 120)
+
+@Composable
+private fun MapChip(text: String, icon: Int, on: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Row(
+        Modifier.pressable(shape) { onClick() }
+            .background(if (on) C.red else C.chrome.copy(alpha = .92f), shape)
+            .padding(start = 12.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Icon(painterResource(icon), null, Modifier.size(16.dp), tint = Color.White)
+        Text(text, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+    }
+}
 
 @Composable
 fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDeleted: () -> Unit) {
@@ -124,6 +149,8 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var rate by remember { mutableIntStateOf(60) }
     var askDelete by remember { mutableStateOf(false) }
     var follow by remember(sel) { mutableStateOf(true) }
+    var rotate by remember { mutableStateOf(false) }
+    var camBearing by remember(sel) { mutableDoubleStateOf(0.0) }
     val data = loaded?.second
 
     LaunchedEffect(playing, rate, data) {
@@ -143,6 +170,20 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
         }
     }
 
+    // Làm mượt góc xoay bản đồ theo hướng xe
+    LaunchedEffect(rotate, follow, data) {
+        val d = data ?: return@LaunchedEffect
+        if (!rotate || !follow || d.pts.size < 2) return@LaunchedEffect
+        d.heading(t)?.let { camBearing = it }
+        while (isActive) {
+            withFrameNanos { }
+            val target = d.heading(t) ?: continue
+            var delta = (target - camBearing + 540) % 360 - 180
+            if (Math.abs(delta) < 0.3) delta = 0.0
+            camBearing = (camBearing + delta * 0.12 + 360) % 360
+        }
+    }
+
     val tracks = remember(data) { if (data == null || data.geo.size < 2) emptyList() else listOf(data.geo) }
     val ready = data != null && data.pts.size >= 2
 
@@ -153,6 +194,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             dot = if (ready) data!!.pos(t) else null,
             fitKey = data, bottomPadFrac = 0.30,
             follow = follow && ready,
+            bearing = if (rotate && follow && ready) camBearing else null,
             onUserGesture = { follow = false },
         )
         TopFade()
@@ -184,23 +226,21 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
 
         Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)) {
             if (ready) {
-                val shape = RoundedCornerShape(24.dp)
                 Row(
-                    Modifier.align(Alignment.End).padding(bottom = 8.dp)
-                        .pressable(shape) { follow = !follow }
-                        .background(if (follow) C.red else C.chrome.copy(alpha = .92f), shape)
-                        .padding(start = 12.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    Modifier.align(Alignment.End).padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        painterResource(if (follow) R.drawable.ic_navigation_on else R.drawable.ic_navigation),
-                        null, Modifier.size(16.dp), tint = Color.White,
-                    )
-                    Text(
+                    MapChip(
+                        if (rotate) "Xoay theo xe" else "Hướng Bắc",
+                        if (rotate) R.drawable.ic_compass_on else R.drawable.ic_compass, rotate,
+                    ) {
+                        rotate = !rotate
+                        if (rotate) follow = true
+                    }
+                    MapChip(
                         if (follow) "Đang bám xe" else "Bám theo xe",
-                        fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White,
-                    )
+                        if (follow) R.drawable.ic_navigation_on else R.drawable.ic_navigation, follow,
+                    ) { follow = !follow }
                 }
             }
             Card {
