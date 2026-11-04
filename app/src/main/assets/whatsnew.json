@@ -1,11 +1,7 @@
-{ "version": "1.0.0", "date": "2026-11-03",
+{ "version": "1.0.1", "date": "2026-11-04",
   "new": [
-    "Tự ghi hành trình khi phát hiện bạn đang đi xe, tự dừng khi đứng yên",
-    "Bản đồ hôm nay với tổng quãng đường, thời gian, tốc độ trung bình và tối đa",
-    "Phát lại hành trình theo thời gian thật, tua nhanh 10× đến 120×",
-    "Danh sách hành trình theo ngày, phát lại cả ngày",
-    "Đồng bộ hành trình lên mây với tài khoản Google",
-    "Tự kiểm tra và cài bản cập nhật mới"
+    "Icon mới của M Ride",
+    "Bật đồng bộ: đăng nhập Google trong Cài đặt để lưu hành trình lên mây"
   ],
   "improved": [],
   "fixed": [] }
