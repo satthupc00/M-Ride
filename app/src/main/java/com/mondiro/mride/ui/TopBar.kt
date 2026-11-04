@@ -112,7 +112,7 @@ fun UpdateButton() {
                     Updater.showDialog.value = true
                 } else scope.launch {
                     when (val r = Updater.check(showIfNew = true)) {
-                        Updater.State.Latest -> Toast.makeText(ctx, "Đã là bản mới nhất", Toast.LENGTH_SHORT).show()
+                        Updater.State.Latest -> Toast.makeText(ctx, "Đã là bản mới nhất (v${com.mondiro.mride.BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
                         is Updater.State.Error -> Toast.makeText(ctx, r.msg, Toast.LENGTH_SHORT).show()
                         else -> {}
                     }

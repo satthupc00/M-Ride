@@ -1,9 +1,9 @@
-{ "version": "1.0.3", "date": "2026-11-04",
+{ "version": "1.0.4", "date": "2026-11-04",
   "new": [],
   "improved": [
-    "Bản đồ mới dạng vector: tải nhanh, nét ở mọi mức zoom, kéo và phóng to mượt hơn",
-    "Bản đồ tối thật sự, dịu mắt khi đi đêm"
+    "Kiểm tra cập nhật nhanh và ổn định hơn, không bị giới hạn lượt hỏi",
+    "Thông báo cập nhật hiện rõ phiên bản đang dùng"
   ],
   "fixed": [
-    "Sửa lỗi bản đồ tải rất chậm, bị ô xám và ô vỡ"
+    "Sửa lỗi bấm kiểm tra cập nhật nhưng không thấy bản mới"
   ] }

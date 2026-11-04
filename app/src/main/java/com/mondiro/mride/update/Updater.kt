@@ -33,36 +33,74 @@ object Updater {
     var available: State.Available? = null
         private set
 
+    private const val REPO = "satthupc00/M-Ride"
+
+    private fun open(url: String, follow: Boolean = true) = (URL(url).openConnection() as HttpURLConnection).apply {
+        instanceFollowRedirects = follow
+        useCaches = false
+        connectTimeout = 10_000
+        readTimeout = 15_000
+        setRequestProperty("User-Agent", "M-Ride-App")
+        setRequestProperty("Cache-Control", "no-cache")
+    }
+
+    /** Cách chính: trang Releases tự chuyển hướng sang tag mới nhất (không giới hạn lượt hỏi). */
+    private fun latestViaRedirect(): State {
+        val c = open("https://github.com/$REPO/releases/latest", follow = false)
+        val loc = c.getHeaderField("Location")
+        c.disconnect()
+        if (loc.isNullOrEmpty() || !loc.contains("/tag/")) throw IllegalStateException("no tag")
+        val tag = loc.substringAfterLast("/tag/").trim('/')
+        val ver = tag.removePrefix("v")
+        if (!newer(ver, BuildConfig.VERSION_NAME)) return State.Latest
+        val url = "https://github.com/$REPO/releases/download/$tag/M-Ride-v$ver.apk"
+        return State.Available(ver, url, notesFor(tag))
+    }
+
+    private fun notesFor(tag: String): String = try {
+        val txt = open("https://raw.githubusercontent.com/$REPO/$tag/app/src/main/assets/whatsnew.json")
+            .inputStream.bufferedReader().use { it.readText() }
+        val j = JSONObject(txt)
+        buildString {
+            for ((k, title) in listOf("new" to "Mới", "improved" to "Cải thiện", "fixed" to "Sửa lỗi")) {
+                val arr = j.optJSONArray(k) ?: continue
+                if (arr.length() == 0) continue
+                if (isNotEmpty()) append("\n")
+                append(title).append(":\n")
+                for (i in 0 until arr.length()) append("•  ").append(arr.getString(i)).append("\n")
+            }
+        }.trim()
+    } catch (_: Exception) {
+        ""
+    }
+
+    /** Cách dự phòng: GitHub API (giới hạn 60 lượt/giờ cho mỗi mạng). */
+    private fun latestViaApi(): State {
+        val c = open(API).apply { setRequestProperty("Accept", "application/vnd.github+json") }
+        if (c.responseCode == 404) throw IllegalStateException("not found")
+        val j = JSONObject(c.inputStream.bufferedReader().use { it.readText() })
+        val tag = j.optString("tag_name").removePrefix("v")
+        val assets = j.optJSONArray("assets")
+        var url = ""
+        if (assets != null) for (i in 0 until assets.length()) {
+            val a = assets.getJSONObject(i)
+            if (a.optString("name").endsWith(".apk")) { url = a.optString("browser_download_url"); break }
+        }
+        return if (url.isNotEmpty() && newer(tag, BuildConfig.VERSION_NAME)) State.Available(tag, url, j.optString("body"))
+        else State.Latest
+    }
+
     suspend fun check(showIfNew: Boolean): State = withContext(Dispatchers.IO) {
         if (state.value is State.Downloading) return@withContext state.value
         state.value = State.Checking
         val result: State = try {
-            val c = (URL(API).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 10_000
-                readTimeout = 15_000
-                setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("User-Agent", "M-Ride-App")
-            }
-            if (c.responseCode == 404) {
-                State.Latest
-            } else {
-                val body = c.inputStream.bufferedReader().use { it.readText() }
-                val j = JSONObject(body)
-                val tag = j.optString("tag_name").removePrefix("v")
-                val assets = j.optJSONArray("assets")
-                var url = ""
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val a = assets.getJSONObject(i)
-                    if (a.optString("name").endsWith(".apk")) {
-                        url = a.optString("browser_download_url"); break
-                    }
-                }
-                if (url.isNotEmpty() && newer(tag, BuildConfig.VERSION_NAME)) {
-                    State.Available(tag, url, j.optString("body"))
-                } else State.Latest
-            }
+            latestViaRedirect()
         } catch (e: Exception) {
-            State.Error("Không kiểm tra được cập nhật")
+            try {
+                latestViaApi()
+            } catch (e2: Exception) {
+                State.Error("Không đọc được trang phát hành trên GitHub")
+            }
         }
         if (result is State.Available) {
             available = result
