@@ -50,6 +50,14 @@ button:active{transform:scale(.95);transition-duration:.06s}
 .tlabel{background:rgba(31,33,38,.92);color:#fff;font-weight:700;font-size:12px;padding:3px 8px;border-radius:10px;
   font-variant-numeric:tabular-nums;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .tlabel.hover{background:#fff;color:#1F2126}
+.legend{position:fixed;z-index:5;top:calc(env(safe-area-inset-top,0px) + 62px);left:max(14px,env(safe-area-inset-left,0px));
+  width:200px;background:rgba(31,33,38,.88);border-radius:10px;padding:7px 10px 6px;font-size:10px;color:var(--muted)}
+.legend .bar{height:7px;border-radius:4px;margin-top:4px;
+  background:linear-gradient(to right,#E5383B 0%,#F28C28 16.7%,#F5C842 33.3%,#2EB872 50%,#1FB5C9 75%,#3D7BFF 100%)}
+.legend .ticks{position:relative;height:14px;margin-top:3px;color:var(--text);font-weight:600}
+.legend .ticks span{position:absolute;transform:translateX(-50%)}
+.legend .ticks span:first-child{transform:none}
+.legend .ticks span:last-child{transform:translateX(-100%)}
 .card{background:rgba(38,41,47,.97);border:1px solid var(--line);border-radius:16px;padding:12px 14px 14px;
   display:flex;flex-direction:column;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -94,6 +102,9 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radiu
   <div class="brand"><img src="icon.png" alt=""><span><span class="m">M</span> Ride</span></div>
   <div class="trip"><b id="tname">Hành trình</b><span id="tdate"></span></div>
 </header>
+
+<div class="legend" aria-label="Chú thích màu theo tốc độ">Tốc độ (km/h)<div class="bar"></div>
+  <div class="ticks"><span style="left:0">0</span><span style="left:16.7%">10</span><span style="left:33.3%">20</span><span style="left:50%">30</span><span style="left:75%">45</span><span style="left:100%">60+</span></div></div>
 
 <div class="dock">
   <div class="chips">
@@ -239,6 +250,11 @@ function demo() {
     ? {top: 90, bottom: 40, left: 480, right: 40}
     : {top: 90, bottom: bottomPad(), left: 30, right: 30};
   const fc = feats => ({type: 'FeatureCollection', features: feats});
+  // tốc độ làm mượt → tô màu từng đoạn: chậm đỏ, nhanh xanh dương
+  const ss = coords.map((_, i) => { let a = 0, c = 0; for (let k = Math.max(0, i - 3); k <= Math.min(n - 1, i + 3); k++) { a += sp[k] || 0; c++; } return a / c; });
+  const segs = fc(coords.slice(0, -1).map((c, i) => ({type: 'Feature', properties: {s: (ss[i] + ss[i + 1]) / 2},
+    geometry: {type: 'LineString', coordinates: [c, coords[i + 1]]}})));
+  const SPEED_COLOR = ['interpolate', ['linear'], ['get', 's'], 0, '#E5383B', 10, '#F28C28', 20, '#F5C842', 30, '#2EB872', 45, '#1FB5C9', 60, '#3D7BFF'];
   const pt = c => ({type: 'Feature', geometry: {type: 'Point', coordinates: c}, properties: {}});
   const ln = cs => ({type: 'Feature', geometry: {type: 'LineString', coordinates: cs}, properties: {}});
 
@@ -250,15 +266,16 @@ function demo() {
       if (l.type !== 'symbol' || !nameLayers.has(l['source-layer']) || /shield|housenumber|ref/.test(l.id)) continue;
       try { map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:vi'], ['get', 'name'], ['get', 'name:latin']]); } catch (e) {}
     }
-    map.addSource('route', {type: 'geojson', data: ln(coords)});
+    map.addSource('route', {type: 'geojson', data: segs});
     map.addSource('prog', {type: 'geojson', data: fc([])});
     map.addSource('start', {type: 'geojson', data: pt(coords[0])});
     map.addSource('dot', {type: 'geojson', data: pt(coords[0])});
     const lineLayout = {'line-cap': 'round', 'line-join': 'round'};
-    map.addLayer({id: 'route', type: 'line', source: 'route', layout: lineLayout, paint: {'line-color': FADED, 'line-width': 5}});
+    map.addLayer({id: 'route-casing', type: 'line', source: 'route', layout: lineLayout, paint: {'line-color': '#2A2C31', 'line-width': 7.5}});
+    map.addLayer({id: 'route', type: 'line', source: 'route', layout: lineLayout, paint: {'line-color': SPEED_COLOR, 'line-width': 5}});
     map.addLayer({id: 'route-hit', type: 'line', source: 'route', layout: lineLayout, paint: {'line-color': '#000', 'line-width': 28, 'line-opacity': 0}});
-    map.addLayer({id: 'prog-glow', type: 'line', source: 'prog', layout: lineLayout, paint: {'line-color': RED, 'line-width': 12, 'line-opacity': .22}});
-    map.addLayer({id: 'prog', type: 'line', source: 'prog', layout: lineLayout, paint: {'line-color': RED, 'line-width': 5}});
+    // đoạn chưa đi: xám phủ lên trên
+    map.addLayer({id: 'prog', type: 'line', source: 'prog', layout: lineLayout, paint: {'line-color': '#A3A8B0', 'line-width': 5.5, 'line-opacity': .92}});
     map.addLayer({id: 'start', type: 'circle', source: 'start', paint: {'circle-radius': 6, 'circle-color': '#1F2126', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
     map.addLayer({id: 'dot-halo', type: 'circle', source: 'dot', paint: {'circle-radius': 16, 'circle-color': RED, 'circle-opacity': .25}});
     map.addLayer({id: 'dot', type: 'circle', source: 'dot', paint: {'circle-radius': 7.5, 'circle-color': RED, 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
@@ -339,7 +356,7 @@ function demo() {
     const dt = last ? (now - last) / 1000 : 0; last = now;
     if (playing) { t = Math.min(total, t + dt * rate); if (t >= total) { playing = false; paintChips(); } }
     const p = pos(t), i = idx(t);
-    map.getSource('prog').setData(ln(coords.slice(0, i + 1).concat([p])));
+    map.getSource('prog').setData(ln([p].concat(coords.slice(i + 1))));
     map.getSource('dot').setData(pt(p));
     if (follow && now > followLockUntil && pointers.size === 0) {
       const opts = {center: p, padding: camPad()};

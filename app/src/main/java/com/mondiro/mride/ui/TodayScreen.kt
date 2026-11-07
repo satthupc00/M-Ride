@@ -112,9 +112,9 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
     val rec by Tracker.state.collectAsState()
     val today = trips.filter { it.startTime in dayStart until dayStart + Fmt.DAY }.sortedBy { it.startTime }
     val stats = DayStats.of(today)
-    val tracks = remember(points) {
-        points.groupBy { it.tripId }.values.map { l -> l.map { GeoPoint(it.lat, it.lon) } }
-    }
+    val groups = remember(points) { points.groupBy { it.tripId }.values.toList() }
+    val tracks = remember(groups) { groups.map { l -> l.map { GeoPoint(it.lat, it.lon) } } }
+    val speeds = remember(groups) { groups.map { l -> smoothSpeeds(l.map { it.speedKmh }) } }
     val live = if (rec.recording) points.lastOrNull { it.tripId == rec.tripId }?.let { GeoPoint(it.lat, it.lon) } else null
     val tick = rememberResumeTick()
     val fallback by produceState<GeoPoint?>(null, tick) { value = lastKnown(ctx) ?: value }
@@ -124,12 +124,13 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
         Box(Modifier.fillMaxSize()) {
             RideMap(
                 Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size,
-                fallbackCenter = fallback, bottomPadFrac = 0.34,
+                fallbackCenter = fallback, bottomPadFrac = 0.34, speeds = speeds,
             )
             TopFade()
             Column(Modifier.fillMaxWidth()) {
                 TopBar { if (rec.recording) RecPill(rec.startTime, now) }
                 PermissionCard(Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                if (tracks.isNotEmpty()) SpeedLegend(Modifier.padding(start = 10.dp, top = 2.dp))
             }
             Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)) {
                 Card {
@@ -180,9 +181,12 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
                 }
             }
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                RideMap(Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size, fallbackCenter = fallback)
+                RideMap(Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size, fallbackCenter = fallback, speeds = speeds)
                 TopFade()
                 TopBar()
+                if (tracks.isNotEmpty()) {
+                    SpeedLegend(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 10.dp, top = 50.dp))
+                }
                 Credit(Modifier.align(Alignment.BottomEnd).padding(10.dp))
             }
         }

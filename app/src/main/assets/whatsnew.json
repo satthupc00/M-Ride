@@ -1,11 +1,10 @@
-{ "version": "1.0.10", "date": "2026-11-04",
+{ "version": "1.0.11", "date": "2026-11-07",
   "new": [
-    "Phát lại: nút la bàn tròn để đưa bản đồ về hướng Bắc, tách riêng với nút \"Xoay theo xe\"",
-    "Xoay bản đồ tự do bằng 2 ngón (trên trang chia sẻ: giữ chuột phải rồi kéo)",
-    "Chạm vào một điểm trên đường đi để tua nhanh tới đó",
-    "Hiện giờ:phút ngay cạnh chấm xe đang chạy"
+    "Đường đi tô màu theo tốc độ: chậm màu đỏ → cam → vàng → xanh lá → nhanh màu xanh dương",
+    "Thanh chú thích màu tốc độ (0–60+ km/h) ở góc trên bản đồ",
+    "Phát lại: đoạn chưa đi hiện màu xám, đoạn đã đi hiện màu theo tốc độ"
   ],
-  "improved": [],
-  "fixed": [
-    "Sửa lỗi tắt xoay theo xe nhưng bản đồ không quay về hướng Bắc"
-  ] }
+  "improved": [
+    "Trang chia sẻ cho bạn bè cũng hiển thị màu theo tốc độ"
+  ],
+  "fixed": [] }

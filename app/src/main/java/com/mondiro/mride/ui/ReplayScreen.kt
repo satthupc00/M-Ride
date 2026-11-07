@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -111,6 +112,18 @@ class ReplayData(val pts: List<TrackPoint>) {
         return (Math.toDegrees(Math.atan2(dLon, dLat)) + 360) % 360
     }
 
+    /** Tốc độ đã làm mượt, dùng để tô màu đường đi. */
+    val speeds: List<Float> = smoothSpeeds(pts.map { it.speedKmh })
+
+    /** Phần đường chưa đi (từ vị trí hiện tại tới cuối). */
+    fun remaining(t: Double): List<GeoPoint> {
+        val i = idx(t)
+        val out = ArrayList<GeoPoint>(geo.size - i + 1)
+        out.add(pos(t))
+        if (i + 1 < geo.size) out.addAll(geo.subList(i + 1, geo.size))
+        return out
+    }
+
     fun timeAt(i: Int): Double = vt[i.coerceIn(0, pts.size - 1)]
 
     fun progress(t: Double): List<GeoPoint> {
@@ -201,8 +214,10 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
 
     Box(Modifier.fillMaxSize()) {
         RideMap(
-            Modifier.fillMaxSize(), tracks, faded = true,
-            progress = if (ready) data!!.progress(t) else null,
+            Modifier.fillMaxSize(), tracks,
+            speeds = if (ready) listOf(data!!.speeds) else null,
+            progress = if (ready) data!!.remaining(t) else null,
+            progressGrey = true,
             dot = if (ready) data!!.pos(t) else null,
             fitKey = data, bottomPadFrac = 0.30,
             follow = follow && ready,
@@ -256,6 +271,10 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                     IconBtn(R.drawable.ic_trash, "Xóa hành trình", C.muted) { askDelete = true }
                 }
             }
+        }
+
+        if (ready) {
+            SpeedLegend(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 10.dp, top = 50.dp))
         }
 
         if (loaded != null && !ready) {

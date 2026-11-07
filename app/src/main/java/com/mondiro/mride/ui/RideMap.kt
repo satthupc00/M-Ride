@@ -3,6 +3,11 @@ package com.mondiro.mride.ui
 import android.content.res.Resources
 import android.graphics.PointF
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -68,6 +73,38 @@ object MapStyles {
 private val density get() = Resources.getSystem().displayMetrics.density
 private const val RED = "#E5383B"
 private const val FADED = "#6A3538"
+
+/** Bảng màu theo tốc độ (km/h): chậm = đỏ → nhanh = xanh dương. Dùng chung cho đường đi và thanh chú thích. */
+val SPEED_STOPS = listOf(
+    0f to "#E5383B", 10f to "#F28C28", 20f to "#F5C842",
+    30f to "#2EB872", 45f to "#1FB5C9", 60f to "#3D7BFF",
+)
+
+private fun speedColorExpr(): Expression = Expression.interpolate(
+    Expression.linear(), Expression.get("s"),
+    *SPEED_STOPS.map { (v, c) -> Expression.stop(v, Expression.color(android.graphics.Color.parseColor(c))) }.toTypedArray(),
+)
+
+/** Làm mượt tốc độ GPS (trung bình trượt) để màu đổi từ từ, không lốm đốm. */
+fun smoothSpeeds(v: List<Float>, w: Int = 3): List<Float> = v.indices.map { i ->
+    var sum = 0f
+    var n = 0
+    for (k in maxOf(0, i - w)..minOf(v.size - 1, i + w)) { sum += v[k]; n++ }
+    if (n == 0) 0f else sum / n
+}
+
+private fun speedSegments(tracks: List<List<GeoPoint>>, speeds: List<List<Float>>): FeatureCollection {
+    val feats = ArrayList<Feature>()
+    tracks.forEachIndexed { k, t ->
+        val sp = speeds.getOrNull(k) ?: return@forEachIndexed
+        for (i in 0 until t.size - 1) {
+            val f = Feature.fromGeometry(lineOf(listOf(t[i], t[i + 1])))
+            f.addNumberProperty("s", ((sp.getOrElse(i) { 0f } + sp.getOrElse(i + 1) { 0f }) / 2f))
+            feats.add(f)
+        }
+    }
+    return FeatureCollection.fromFeatures(feats)
+}
 
 private fun emptyFc(): FeatureCollection = FeatureCollection.fromFeatures(ArrayList<Feature>())
 
@@ -206,6 +243,8 @@ fun RideMap(
     onUserRotate: (() -> Unit)? = null,
     cam: MapCam? = null,
     northTick: Int = 0,
+    speeds: List<List<Float>>? = null,
+    progressGrey: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val gestureCb by rememberUpdatedState(onUserGesture)
@@ -309,15 +348,38 @@ fun RideMap(
         m.setStyle(Style.Builder().fromUri(if (dark) MapStyles.DARK else MapStyles.COLOR), onLoaded)
     }
 
-    LaunchedEffect(style, tracks, faded) {
+    LaunchedEffect(style, tracks, faded, speeds) {
         val s = style ?: return@LaunchedEffect
-        val feats = tracks.filter { it.size >= 2 }.map { Feature.fromGeometry(lineOf(it)) }
-        s.getSourceAs<GeoJsonSource>("tracks")?.setGeoJson(FeatureCollection.fromFeatures(feats))
-        s.getLayerAs<LineLayer>("tracks-line")?.setProperties(PropertyFactory.lineColor(if (faded) FADED else RED))
-        s.getLayerAs<LineLayer>("tracks-glow")?.setProperties(
-            PropertyFactory.visibility(if (faded) Property.NONE else Property.VISIBLE)
-        )
+        val line = s.getLayerAs<LineLayer>("tracks-line")
+        val glow = s.getLayerAs<LineLayer>("tracks-glow")
+        if (speeds != null) {
+            // Tô màu theo tốc độ; viền tối mờ phía dưới để nổi trên nền bản đồ màu
+            s.getSourceAs<GeoJsonSource>("tracks")?.setGeoJson(speedSegments(tracks, speeds))
+            line?.setProperties(PropertyFactory.lineColor(speedColorExpr()), PropertyFactory.lineWidth(5f))
+            glow?.setProperties(
+                PropertyFactory.visibility(Property.VISIBLE), PropertyFactory.lineColor("#2A2C31"),
+                PropertyFactory.lineOpacity(1f), PropertyFactory.lineWidth(7.5f),
+            )
+        } else {
+            val feats = tracks.filter { it.size >= 2 }.map { Feature.fromGeometry(lineOf(it)) }
+            s.getSourceAs<GeoJsonSource>("tracks")?.setGeoJson(FeatureCollection.fromFeatures(feats))
+            line?.setProperties(PropertyFactory.lineColor(if (faded) FADED else RED), PropertyFactory.lineWidth(4.5f))
+            glow?.setProperties(
+                PropertyFactory.visibility(if (faded) Property.NONE else Property.VISIBLE),
+                PropertyFactory.lineColor(RED), PropertyFactory.lineOpacity(0.22f), PropertyFactory.lineWidth(11f),
+            )
+        }
         s.getSourceAs<GeoJsonSource>("start")?.setGeoJson(pointFc(tracks.firstOrNull()?.firstOrNull()))
+    }
+
+    // Phát lại: đoạn chưa đi phủ màu xám lên trên đường màu
+    LaunchedEffect(style, progressGrey) {
+        val s = style ?: return@LaunchedEffect
+        s.getLayerAs<LineLayer>("progress-line")?.setProperties(
+            PropertyFactory.lineColor(if (progressGrey) "#A3A8B0" else RED),
+            PropertyFactory.lineWidth(if (progressGrey) 5.5f else 4.5f),
+            PropertyFactory.lineOpacity(if (progressGrey) 0.92f else 1f),
+        )
     }
 
     SideEffect {
@@ -412,7 +474,37 @@ fun RideMap(
         Text(
             "© OpenFreeMap © OpenStreetMap",
             fontSize = 9.sp, color = C.muted,
-            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 12.dp, top = 46.dp),
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 12.dp, top = 46.dp),
         )
+    }
+}
+
+
+/** Thanh chú thích màu theo tốc độ. */
+@Composable
+fun SpeedLegend(modifier: Modifier = Modifier) {
+    val maxV = SPEED_STOPS.last().first
+    val stops = SPEED_STOPS.map { (v, c) -> v / maxV to androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(c)) }
+    androidx.compose.foundation.layout.Column(
+        modifier
+            .background(C.chrome.copy(alpha = .88f), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp)
+            .width(196.dp),
+    ) {
+        Text("Tốc độ (km/h)", fontSize = 10.sp, color = C.muted)
+        Box(
+            Modifier.padding(top = 4.dp).fillMaxWidth().height(7.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
+                .background(androidx.compose.ui.graphics.Brush.horizontalGradient(*stops.toTypedArray()))
+        )
+        Box(Modifier.fillMaxWidth().padding(top = 3.dp)) {
+            SPEED_STOPS.forEach { (v, _) ->
+                Text(
+                    if (v == maxV) "${v.toInt()}+" else "${v.toInt()}",
+                    fontSize = 10.sp, color = C.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    modifier = Modifier.align(androidx.compose.ui.BiasAlignment(v / maxV * 2f - 1f, 0f)),
+                )
+            }
+        }
     }
 }
