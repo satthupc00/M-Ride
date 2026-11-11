@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 
@@ -284,7 +286,11 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             )
         }
 
-        Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)) {
+        Column(
+            Modifier.align(if (compact) Alignment.BottomCenter else Alignment.BottomStart)
+                .then(if (compact) Modifier else Modifier.navigationBarsPadding().padding(bottom = 10.dp).widthIn(max = 540.dp))
+                .padding(horizontal = 10.dp)
+        ) {
             if (ready) {
                 Row(
                     Modifier.align(Alignment.End).padding(bottom = 8.dp),

@@ -1,10 +1,8 @@
-{ "version": "1.0.11", "date": "2026-11-07",
-  "new": [
-    "Đường đi tô màu theo tốc độ: chậm màu đỏ → cam → vàng → xanh lá → nhanh màu xanh dương",
-    "Thanh chú thích màu tốc độ (0–60+ km/h) ở góc trên bản đồ",
-    "Phát lại: đoạn chưa đi hiện màu xám, đoạn đã đi hiện màu theo tốc độ"
-  ],
+{ "version": "1.0.12", "date": "2026-11-11",
+  "new": [],
   "improved": [
-    "Trang chia sẻ cho bạn bè cũng hiển thị màu theo tốc độ"
+    "Màn hình trong Z Fold: tab Hôm nay cho bản đồ toàn màn hình, bảng số liệu gọn ở góc dưới trái",
+    "Tab Hành trình: chọn chuyến là danh sách tự thu vào, bản đồ phát lại chiếm toàn màn hình; bấm \"Hành trình\" để mở lại danh sách",
+    "Bảng điều khiển phát lại trên màn trong thu gọn về góc, chừa chỗ cho bản đồ"
   ],
   "fixed": [] }

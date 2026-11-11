@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -120,76 +122,48 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
     val fallback by produceState<GeoPoint?>(null, tick) { value = lastKnown(ctx) ?: value }
     val replayToday = { onReplay(ReplaySel(today.map { it.id }, "Hôm nay")) }
 
-    if (!wide) {
-        Box(Modifier.fillMaxSize()) {
-            RideMap(
-                Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size,
-                fallbackCenter = fallback, bottomPadFrac = 0.34, speeds = speeds,
+    Box(Modifier.fillMaxSize()) {
+        RideMap(
+            Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size,
+            fallbackCenter = fallback, bottomPadFrac = if (wide) 0.30 else 0.34, speeds = speeds,
+        )
+        TopFade()
+        Column(Modifier.fillMaxWidth()) {
+            TopBar { if (rec.recording) RecPill(rec.startTime, now) }
+            PermissionCard(
+                Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    .then(if (wide) Modifier.widthIn(max = 460.dp) else Modifier)
             )
-            TopFade()
-            Column(Modifier.fillMaxWidth()) {
-                TopBar { if (rec.recording) RecPill(rec.startTime, now) }
-                PermissionCard(Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-                if (tracks.isNotEmpty()) SpeedLegend(Modifier.padding(start = 10.dp, top = 2.dp))
-            }
-            Column(Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)) {
-                Card {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text("Hôm nay", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = C.text)
-                            Spacer(Modifier.weight(1f))
-                            Text("${Fmt.day(now)} · ${today.size} chuyến", fontSize = 12.sp, color = C.muted)
-                        }
-                        StatsGrid(stats, false, C.chrome)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            RedButton("Phát lại hôm nay", R.drawable.ic_play, Modifier.weight(1f), enabled = today.isNotEmpty(), onClick = replayToday)
-                            GhostButton(
-                                if (rec.recording) "Dừng" else "Ghi",
-                                if (rec.recording) R.drawable.ic_stop else R.drawable.ic_record,
-                                iconTint = C.red,
-                            ) { toggleRecording(ctx) }
-                        }
+            if (tracks.isNotEmpty()) SpeedLegend(Modifier.padding(start = 10.dp, top = 2.dp))
+        }
+        // Màn trong Z Fold: bảng gọn ở góc dưới trái, bản đồ chiếm toàn màn hình
+        Column(
+            Modifier.align(if (wide) Alignment.BottomStart else Alignment.BottomCenter)
+                .then(if (wide) Modifier.navigationBarsPadding().padding(bottom = 10.dp) else Modifier)
+                .padding(horizontal = 10.dp)
+                .then(if (wide) Modifier.widthIn(max = 460.dp) else Modifier)
+        ) {
+            Card {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text("Hôm nay", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = C.text)
+                        Spacer(Modifier.weight(1f))
+                        Text("${Fmt.day(now)} · ${today.size} chuyến", fontSize = 12.sp, color = C.muted)
+                    }
+                    StatsGrid(stats, false, C.chrome)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        RedButton("Phát lại hôm nay", R.drawable.ic_play, Modifier.weight(1f), enabled = today.isNotEmpty(), onClick = replayToday)
+                        GhostButton(
+                            if (rec.recording) "Dừng" else "Ghi",
+                            if (rec.recording) R.drawable.ic_stop else R.drawable.ic_record,
+                            iconTint = C.red,
+                        ) { toggleRecording(ctx) }
                     }
                 }
-                Credit(Modifier.align(Alignment.End).padding(top = 3.dp, bottom = 3.dp, end = 2.dp))
             }
+            if (!wide) Credit(Modifier.align(Alignment.End).padding(top = 3.dp, bottom = 3.dp, end = 2.dp))
         }
-    } else {
-        Row(Modifier.fillMaxSize()) {
-            Column(
-                Modifier.width(340.dp).fillMaxHeight().background(C.chrome)
-                    .verticalScroll(rememberScrollState())
-                    .statusBarsPadding().padding(start = 14.dp, end = 14.dp, top = 44.dp, bottom = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("Hôm nay", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = C.text)
-                Text("${Fmt.day(now)} · ${today.size} chuyến", fontSize = 12.5.sp, color = C.muted)
-                if (rec.recording) RecPill(rec.startTime, now)
-                PermissionCard()
-                StatsGrid(stats, true, C.panel)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RedButton("Phát lại hôm nay", R.drawable.ic_play, Modifier.weight(1f), enabled = today.isNotEmpty(), onClick = replayToday)
-                    GhostButton(
-                        if (rec.recording) "Dừng" else "Ghi",
-                        if (rec.recording) R.drawable.ic_stop else R.drawable.ic_record,
-                        iconTint = C.red,
-                    ) { toggleRecording(ctx) }
-                }
-                Spacer(Modifier.height(4.dp))
-                today.asReversed().forEach { t ->
-                    TripRow(t, selected = false) { onReplay(ReplaySel(listOf(t.id), t.name)) }
-                }
-            }
-            Box(Modifier.weight(1f).fillMaxHeight()) {
-                RideMap(Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size, fallbackCenter = fallback, speeds = speeds)
-                TopFade()
-                TopBar()
-                if (tracks.isNotEmpty()) {
-                    SpeedLegend(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 10.dp, top = 50.dp))
-                }
-                Credit(Modifier.align(Alignment.BottomEnd).padding(10.dp))
-            }
-        }
+        if (wide) Credit(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(10.dp))
     }
 }
 
