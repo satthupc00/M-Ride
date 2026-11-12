@@ -72,6 +72,11 @@ object Fmt {
     fun km(m: Double): String = String.format(vi, "%.1f", m / 1000.0)
     fun hm(t: Long): String = SimpleDateFormat("HH:mm", vi).format(Date(t))
     fun hms(t: Long): String = SimpleDateFormat("HH:mm:ss", vi).format(Date(t))
+    /** Thời gian đã đi, dạng H:MM:SS. */
+    fun elapsed(ms: Long): String {
+        val s = (ms / 1000).coerceAtLeast(0)
+        return String.format(vi, "%d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60)
+    }
     fun dur(ms: Long): String {
         val min = ms / 60_000
         return if (min >= 60) "${min / 60}:${String.format(vi, "%02d", min % 60)}" else "$min ph"

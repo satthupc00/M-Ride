@@ -66,7 +66,10 @@ button:active{transform:scale(.95);transition-duration:.06s}
 .stat b small{font-size:11px;color:var(--muted);font-weight:600}
 .stat span{font-size:10.5px;color:var(--muted)}
 .ptop{display:flex;align-items:center;gap:10px}
-.clock{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.clock{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;cursor:pointer}
+.clockrow{display:flex;align-items:center;gap:8px}
+.ctog{border:1px solid var(--line);background:var(--chrome);color:var(--muted);border-radius:12px;font-size:11px;font-weight:700;padding:4px 8px}
+.ctog.on{background:var(--selected);border-color:var(--red);color:var(--text)}
 .meta{font-size:12px;color:var(--muted)}
 .spd{margin-left:auto;text-align:right}
 .spd b{font-size:22px;font-variant-numeric:tabular-nums}
@@ -115,7 +118,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radiu
   <section class="card">
     <div class="stats" id="stats"></div>
     <div class="ptop">
-      <div><div class="clock" id="clock">--:--:--</div><div class="meta" id="meta"></div></div>
+      <div><div class="clockrow"><div class="clock" id="clock" title="Chạm để đổi giờ thực / thời gian đã đi">--:--:--</div><button class="ctog" id="ctog">⇄ Giờ thực</button></div><div class="meta" id="meta"></div></div>
       <div class="spd"><b id="spd">0</b><small>km/h</small></div>
     </div>
     <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Tua hành trình">
@@ -343,11 +346,19 @@ function demo() {
   map.on('mousemove', 'route-hit', e => {
     map.getCanvas().style.cursor = 'pointer';
     const k = nearestIdx(e.point); if (k < 0) return;
-    hoverEl.textContent = hm(clock(vt[k]));
+    hoverEl.textContent = showElapsed ? elapsedShort(clock(vt[k]) - d.start) : hm(clock(vt[k]));
     hoverMarker.setLngLat(coords[k]); if (!hoverOn) { hoverMarker.addTo(map); hoverOn = true; }
   });
   map.on('mouseleave', 'route-hit', () => { map.getCanvas().style.cursor = ''; hoverMarker.remove(); hoverOn = false; });
   $('playBtn').onclick = () => { if (t >= total) t = 0; playing = !playing; paintChips(); };
+  // Đồng hồ: giờ thực ↔ thời gian đã đi (tính từ lúc xuất phát)
+  let showElapsed = false;
+  try { showElapsed = localStorage.getItem('mr-elapsed') === '1'; } catch (e) {}
+  const elapsedStr = ms => { const x = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(x / 3600)}:${pad(Math.floor(x / 60) % 60)}:${pad(x % 60)}`; };
+  const elapsedShort = ms => dur(ms);
+  const paintClockTog = () => { $('ctog').classList.toggle('on', showElapsed); $('ctog').textContent = showElapsed ? '⇄ Đã đi' : '⇄ Giờ thực'; };
+  const toggleClock = () => { showElapsed = !showElapsed; try { localStorage.setItem('mr-elapsed', showElapsed ? '1' : '0'); } catch (e) {} paintClockTog(); };
+  $('ctog').onclick = toggleClock; $('clock').onclick = toggleClock; paintClockTog();
   const scrub = $('scrub');
   scrub.oninput = () => { t = scrub.value / 1000 * total; };
 
@@ -364,8 +375,9 @@ function demo() {
       else if (toNorth) { const dl = ((0 - camB + 540) % 360) - 180; camB = Math.abs(dl) < 0.5 ? 0 : (camB + dl * 0.15 + 360) % 360; if (camB === 0) toNorth = false; opts.bearing = camB; }
       map.jumpTo(opts);
     }
-    timeMarker.setLngLat(p); tlEl.textContent = hm(clock(t));
-    $('clock').textContent = hms(clock(t));
+    const ct = clock(t), el = ct - d.start;
+    timeMarker.setLngLat(p); tlEl.textContent = showElapsed ? elapsedShort(el) : hm(ct);
+    $('clock').textContent = showElapsed ? elapsedStr(el) : hms(ct);
     $('spd').textContent = Math.round(speed(t));
     if (document.activeElement !== scrub) scrub.value = total ? t / total * 1000 : 0;
     scrub.style.setProperty('--fill', (total ? t / total * 100 : 0) + '%');

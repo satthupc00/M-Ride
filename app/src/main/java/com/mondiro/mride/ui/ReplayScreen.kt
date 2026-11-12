@@ -3,6 +3,9 @@ package com.mondiro.mride.ui
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
+import com.mondiro.mride.data.Prefs
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -174,6 +177,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var northAnim by remember { mutableStateOf(false) }
     var northTick by remember { mutableIntStateOf(0) }
     val cam = remember { MapCam() }
+    val showElapsed by Prefs.clockElapsed.collectAsState()
     val data = loaded?.second
 
     LaunchedEffect(playing, rate, data) {
@@ -224,7 +228,9 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             fitKey = data, bottomPadFrac = 0.30,
             follow = follow && ready,
             bearing = if ((rotate || northAnim) && ready) camBearing else null,
-            dotLabel = if (ready) Fmt.hm(data!!.clock(t)) else null,
+            dotLabel = if (!ready) null
+            else if (showElapsed) Fmt.dur(data!!.clock(t) - data.pts.first().time)
+            else Fmt.hm(data!!.clock(t)),
             onRouteTap = { k -> data?.let { t = it.timeAt(k) } },
             onUserRotate = { rotate = false; northAnim = false },
             cam = cam,
@@ -324,10 +330,26 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                 Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                if (ready) Fmt.hms(data!!.clock(t)) else "--:--:--",
-                                fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = C.text,
-                            )
+                            // Chạm vào đồng hồ hoặc nút bên cạnh để đổi giữa giờ thực và thời gian đã đi
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    if (!ready) "--:--:--"
+                                    else if (showElapsed) Fmt.elapsed(data!!.clock(t) - data.pts.first().time)
+                                    else Fmt.hms(data!!.clock(t)),
+                                    fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = C.text,
+                                    modifier = Modifier.pressable(RoundedCornerShape(6.dp)) { Prefs.setClockElapsed(!showElapsed) },
+                                )
+                                val chip = RoundedCornerShape(12.dp)
+                                Text(
+                                    if (showElapsed) "⇄ Đã đi" else "⇄ Giờ thực",
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    color = if (showElapsed) C.text else C.muted,
+                                    modifier = Modifier.pressable(chip) { Prefs.setClockElapsed(!showElapsed) }
+                                        .background(if (showElapsed) C.selected else C.chrome, chip)
+                                        .border(1.dp, if (showElapsed) C.red else C.line, chip)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
                             val first = loaded?.first?.firstOrNull()
                             Text(
                                 (if (sel.ids.size == 1) first?.name?.ifBlank { "Chuyến đi" } else sel.title) +

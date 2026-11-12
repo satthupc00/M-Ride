@@ -1,8 +1,10 @@
-{ "version": "1.0.12", "date": "2026-11-11",
-  "new": [],
+{ "version": "1.0.13", "date": "2026-11-12",
+  "new": [
+    "Phát lại: nút \"⇄\" cạnh đồng hồ để đổi giữa giờ thực và thời gian đã đi tính từ lúc xuất phát",
+    "Nhãn giờ trên chấm xe cũng đổi theo chế độ đang chọn"
+  ],
   "improved": [
-    "Màn hình trong Z Fold: tab Hôm nay cho bản đồ toàn màn hình, bảng số liệu gọn ở góc dưới trái",
-    "Tab Hành trình: chọn chuyến là danh sách tự thu vào, bản đồ phát lại chiếm toàn màn hình; bấm \"Hành trình\" để mở lại danh sách",
-    "Bảng điều khiển phát lại trên màn trong thu gọn về góc, chừa chỗ cho bản đồ"
+    "App nhớ chế độ đồng hồ bạn chọn cho lần xem sau",
+    "Trang chia sẻ cho bạn bè cũng có nút đổi giờ"
   ],
   "fixed": [] }
