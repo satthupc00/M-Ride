@@ -138,7 +138,7 @@ class TrackingService : Service() {
             last = existing?.let { dao.points(it.id).lastOrNull() }
             lastMove = now
             anchorSet = false
-            Tracker.state.value = Tracker.State(true, t.id, t.startTime, t.distanceM, 0f, auto)
+            Tracker.state.value = Tracker.State(true, t.id, t.startTime, t.distanceM, 0f, auto = auto)
         }
         withContext(Dispatchers.Main) { requestUpdates() }
         watchdog = scope.launch {
