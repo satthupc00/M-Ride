@@ -30,6 +30,20 @@ Nếu thiếu 2 secret này, Actions chỉ build thử chứ không tạo bản 
        match /users/{uid}/{doc=**} {
          allow read, write: if request.auth != null && request.auth.uid == uid;
        }
+       // Máy tính đã ghép mã được đọc hành trình
+       match /users/{uid}/trips/{tid} {
+         allow read: if request.auth != null && exists(/databases/$(db)/documents/users/$(uid)/devices/$(request.auth.uid));
+       }
+       match /users/{uid}/devices/{did} {
+         allow get, delete: if request.auth != null && request.auth.uid == did;
+       }
+       match /pairings/{code} {
+         allow get: if request.auth != null;
+         allow create: if request.auth != null && request.resource.data.pcUid == request.auth.uid;
+         allow update: if request.auth != null && request.resource.data.ownerUid == request.auth.uid
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerUid']);
+         allow delete: if request.auth != null && resource.data.pcUid == request.auth.uid;
+       }
        // Link chia sẻ phát lại: ai có link đều xem được, hết 24 giờ thì không xem được nữa
        match /shares/{id} {
          allow get: if resource.data.expiresAt > request.time;
@@ -49,3 +63,8 @@ Nếu thiếu 2 secret này, Actions chỉ build thử chứ không tạo bản 
 - Trang xem nằm ở `web/share/`, tự đưa lên GitHub Pages: `https://satthupc00.github.io/M-Ride/share/?id=...`
 - Bật một lần: repo **Settings → Pages → Source: GitHub Actions**.
 - Tự xoá dữ liệu sau 24 giờ: Firebase Console → **Firestore Database → tab TTL** (hoặc "Time-to-live") → **Create policy** → Collection group: `shares`, Timestamp field: `expiresAt` → Save.
+
+## Bản PC (Windows)
+- Thư mục `desktop/` (Electron). GitHub Actions tự build bộ cài và phát hành với tag `pc-vX.Y.Z` (không đánh dấu latest để tách khỏi bản Android).
+- Cần bật một lần: Firebase → **Authentication → Sign-in method → Anonymous → Enable**.
+- Ghép máy: mở app PC → hiện mã 6 số → trên điện thoại vào **Cài đặt → Máy tính → Kết nối máy tính** → nhập mã.

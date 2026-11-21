@@ -1,0 +1,36 @@
+{
+  "name": "m-ride-pc",
+  "productName": "M Ride",
+  "version": "1.0.0",
+  "description": "M Ride - xem lại hành trình trên máy tính",
+  "author": "Mondiro",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "dependencies": {
+    "firebase": "10.14.1",
+    "maplibre-gl": "4.7.1"
+  },
+  "devDependencies": {
+    "electron": "31.7.0",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.mondiro.mride.pc",
+    "productName": "M Ride",
+    "directories": { "buildResources": "build", "output": "dist" },
+    "files": ["main.js", "preload.js", "renderer/**/*", "package.json", "node_modules/**/*"],
+    "win": { "target": "nsis", "icon": "build/icon.ico", "artifactName": "M-Ride-Setup-${version}.${ext}" },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "M Ride",
+      "runAfterFinish": true
+    }
+  }
+}

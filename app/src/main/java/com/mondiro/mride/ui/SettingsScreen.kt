@@ -23,6 +23,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -111,6 +113,9 @@ fun SettingsScreen(wide: Boolean) {
     val syncSt by Sync.status.collectAsState()
     val upd by Updater.state.collectAsState()
     var showNew by remember { mutableStateOf(false) }
+    var showPair by remember { mutableStateOf(false) }
+    var pcTick by remember { mutableIntStateOf(0) }
+    val pcCount by produceState(0, email, pcTick) { value = Sync.computerCount() }
 
     Box(Modifier.fillMaxSize().background(C.chrome)) {
         Column(Modifier.fillMaxSize()) {
@@ -158,6 +163,30 @@ fun SettingsScreen(wide: Boolean) {
                         ) {
                             GhostButton("Đăng xuất", R.drawable.ic_logout, height = 34) {
                                 scope.launch { Sync.signOut(ctx) }
+                            }
+                        }
+                    }
+                }
+
+                if (Sync.available() && email != null) {
+                    Group("Máy tính") {
+                        Item(
+                            "Kết nối máy tính",
+                            if (pcCount > 0) "Đã kết nối $pcCount máy tính · xem lại hành trình trên PC"
+                            else "Nhập mã 6 số hiện trên app M Ride bản PC",
+                            divider = false,
+                        ) {
+                            GhostButton("Nhập mã", null, height = 34) { showPair = true }
+                        }
+                        if (pcCount > 0) {
+                            Item("Ngắt kết nối tất cả máy tính", "Các máy tính sẽ không xem được hành trình nữa") {
+                                GhostButton("Ngắt", null, height = 34) {
+                                    scope.launch {
+                                        val ok = Sync.unpairAllComputers()
+                                        Toast.makeText(ctx, if (ok) "Đã ngắt kết nối máy tính" else "Không ngắt được, thử lại", Toast.LENGTH_SHORT).show()
+                                        pcTick++
+                                    }
+                                }
                             }
                         }
                     }
@@ -213,5 +242,58 @@ fun SettingsScreen(wide: Boolean) {
         }
     }
     if (showNew) WhatsNewDialog { showNew = false }
+    if (showPair) PairDialog(onDone = { showPair = false; pcTick++ })
 }
 
+
+
+@Composable
+private fun PairDialog(onDone: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var code by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var err by remember { mutableStateOf<String?>(null) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = { if (!busy) onDone() },
+        containerColor = C.panel,
+        title = { Text("Kết nối máy tính", color = C.text, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Mở M Ride trên máy tính, nhập mã 6 số đang hiện trên màn hình.", color = C.muted, fontSize = 13.sp)
+                androidx.compose.material3.OutlinedTextField(
+                    value = code,
+                    onValueChange = { v -> code = v.filter(Char::isDigit).take(6); err = null },
+                    singleLine = true,
+                    placeholder = { Text("000000") },
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 6.sp, color = C.text,
+                    ),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword,
+                    ),
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = C.red, unfocusedBorderColor = C.line, cursorColor = C.red,
+                    ),
+                )
+                err?.let { Text(it, color = C.red, fontSize = 12.5.sp) }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(enabled = code.length == 6 && !busy, onClick = {
+                busy = true
+                scope.launch {
+                    val e = Sync.pairComputer(code)
+                    busy = false
+                    if (e == null) {
+                        Toast.makeText(ctx, "Đã kết nối máy tính", Toast.LENGTH_SHORT).show()
+                        onDone()
+                    } else err = e
+                }
+            }) { Text(if (busy) "Đang kết nối…" else "Kết nối", color = C.red, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(enabled = !busy, onClick = onDone) { Text("Huỷ", color = C.text) }
+        },
+    )
+}

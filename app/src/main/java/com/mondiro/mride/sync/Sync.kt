@@ -149,6 +149,56 @@ object Sync {
         }
     }
 
+    /** Ghép máy tính bằng mã 6 số hiện trên app PC. Trả về null nếu thành công, ngược lại là câu báo lỗi. */
+    suspend fun pairComputer(code: String): String? {
+        if (!available()) return "Đồng bộ chưa được thiết lập"
+        val user = FirebaseAuth.getInstance().currentUser ?: return "Đăng nhập trong mục Đồng bộ trước"
+        val c = code.filter(Char::isDigit)
+        if (c.length != 6) return "Mã gồm 6 chữ số"
+        return try {
+            withTimeout(20_000) {
+                val fs = FirebaseFirestore.getInstance()
+                val ref = fs.collection("pairings").document(c)
+                val snap = ref.get(Source.SERVER).await()
+                val pc = snap.getString("pcUid")
+                val exp = snap.getTimestamp("expiresAt")?.toDate()?.time ?: 0L
+                when {
+                    !snap.exists() || pc == null -> "Không tìm thấy mã, kiểm tra lại mã trên máy tính"
+                    exp < System.currentTimeMillis() -> "Mã đã hết hạn, bấm \"Tạo mã mới\" trên máy tính"
+                    else -> {
+                        fs.collection("users").document(user.uid).collection("devices").document(pc)
+                            .set(mapOf("name" to "Máy tính", "addedAt" to Timestamp.now())).await()
+                        ref.update("ownerUid", user.uid).await()
+                        null
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "pair", e)
+            "Không kết nối được, kiểm tra mạng rồi thử lại"
+        }
+    }
+
+    suspend fun computerCount(): Int {
+        if (!available()) return 0
+        val user = FirebaseAuth.getInstance().currentUser ?: return 0
+        return try {
+            FirebaseFirestore.getInstance().collection("users").document(user.uid)
+                .collection("devices").get().await().size()
+        } catch (e: Exception) { 0 }
+    }
+
+    suspend fun unpairAllComputers(): Boolean {
+        if (!available()) return false
+        val user = FirebaseAuth.getInstance().currentUser ?: return false
+        return try {
+            val snap = FirebaseFirestore.getInstance().collection("users").document(user.uid)
+                .collection("devices").get().await()
+            for (d in snap.documents) d.reference.delete().await()
+            true
+        } catch (e: Exception) { false }
+    }
+
     fun deleteRemote(uuid: String) {
         Prefs.addDeleted(uuid)
         if (!available()) return

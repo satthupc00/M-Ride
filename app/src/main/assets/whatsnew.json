@@ -1,12 +1,6 @@
-{ "version": "1.0.15", "date": "2026-11-21",
+{ "version": "1.0.16", "date": "2026-11-21",
   "new": [
-    "Phát lại: nút con mắt để ẩn hết giao diện, chỉ còn bản đồ và xe; chạm bản đồ để hiện lại",
-    "Đồng hồ tốc độ hình vòng cung gắn ngay trên bảng Hôm nay, chỉ hiện khi đang ghi"
+    "Update Administrator"
   ],
-  "improved": [
-    "Màn trong Z Fold: tab Hành trình giống màn ngoài — danh sách toàn màn hình (2 cột), chọn chuyến thì bản đồ phát lại toàn màn hình",
-    "Đồng hồ tốc độ không còn che bản đồ và vị trí xe"
-  ],
-  "fixed": [
-    "Sửa lỗi bản đồ phát lại bị ép hẹp và các nút bị méo trên màn trong"
-  ] }
+  "improved": [],
+  "fixed": [] }

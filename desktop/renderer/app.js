@@ -327,7 +327,7 @@ function wireUi() {
 let version = '1.0.0', wn = null, upd = null;
 async function loadMeta() {
   try { version = API ? await API.version() : version; } catch (e) {}
-  try { wn = await (await fetch('whatsnew.json')).json(); } catch (e) {}
+  try { wn = API ? await API.whatsnew() : await (await fetch('whatsnew.json')).json(); } catch (e) {}
   $('verText').textContent = 'v' + version;
 }
 function openSettings() {
@@ -375,11 +375,23 @@ async function installUpdate() {
 /* ---------- kết nối điện thoại (ghép mã) ---------- */
 let db = null, auth = null, unsubTrips = null, unsubPair = null;
 async function initCloud() {
-  firebase.initializeApp(FB_CONFIG);
+  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
   auth = firebase.auth(); db = firebase.firestore();
-  try { await db.enablePersistence(); } catch (e) {}
+  if (!initCloud.persist) { initCloud.persist = true; try { await db.enablePersistence(); } catch (e) {} }
   setSync('pending', 'Đang kết nối…');
-  await new Promise(res => { const u = auth.onAuthStateChanged(x => { if (x) { u(); res(); } }); auth.signInAnonymously().catch(() => {}); });
+  try {
+    await new Promise((res, rej) => {
+      const u = auth.onAuthStateChanged(x => { if (x) { u(); res(); } });
+      auth.signInAnonymously().catch(e => { u(); rej(e); });
+    });
+  } catch (e) {
+    // không đăng nhập được máy tính (mất mạng hoặc dịch vụ đồng bộ chưa bật chế độ cho máy tính)
+    setSync('error', 'Không kết nối được dịch vụ đồng bộ'); $('status').textContent = 'Không kết nối được';
+    $('pair').hidden = false; $('pairCode').textContent = '------';
+    $('pairStatus').textContent = 'Không kết nối được. Kiểm tra mạng rồi bấm "Tạo mã mới" để thử lại.';
+    $('pairNew').onclick = () => { $('pairNew').onclick = () => startPairing(); initCloud().catch(() => {}); };
+    return;
+  }
   if (store.get('mr-owner')) loadTrips(); else startPairing();
 }
 async function startPairing() {

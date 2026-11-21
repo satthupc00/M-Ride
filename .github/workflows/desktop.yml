@@ -1,0 +1,69 @@
+name: Build PC (Windows)
+
+on:
+  push:
+    branches: [ main, ccr-cf10c2f3-u6vnmx ]
+    paths: [ 'desktop/**', '.github/workflows/desktop.yml' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cài thư viện
+        run: npm install --no-audit --no-fund
+
+      - name: Build bộ cài Windows
+        run: npx electron-builder --win nsis --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Đọc version
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: M-Ride-PC-${{ steps.v.outputs.version }}
+          path: desktop/dist/*.exe
+
+      - name: Ghi chú phát hành từ whatsnew.json
+        run: |
+          node -e "
+          const w=require('./renderer/whatsnew.json');const out=[];
+          for (const [k,t] of [['new','Mới'],['improved','Cải thiện'],['fixed','Sửa lỗi']]) if ((w[k]||[]).length){out.push('### '+t);w[k].forEach(x=>out.push('- '+x));out.push('');}
+          require('fs').writeFileSync('notes.md',out.join('\n'));"
+
+      - name: Kiểm tra tag đã có chưa
+        id: tag
+        run: |
+          if git ls-remote --tags origin "refs/tags/pc-v${{ steps.v.outputs.version }}" | grep -q .; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Bản PC phát hành riêng (tag pc-v...), không đánh dấu "latest" để không ảnh hưởng bản Android
+      - name: Tạo bản phát hành PC
+        if: steps.tag.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pc-v${{ steps.v.outputs.version }}
+          name: M Ride PC v${{ steps.v.outputs.version }}
+          body_path: desktop/notes.md
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          files: desktop/dist/M-Ride-Setup-${{ steps.v.outputs.version }}.exe
