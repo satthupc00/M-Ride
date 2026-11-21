@@ -181,7 +181,9 @@ class TrackingService : Service() {
             l.hasSpeed() -> l.speed * 3.6f
             dt > 0 -> (d / dt * 3.6).toFloat()
             else -> 0f
-        }
+        }.coerceAtLeast(0f)
+        // tốc độ hiện tại cho đồng hồ trên màn hình (cập nhật cả khi không lưu điểm)
+        Tracker.state.value = Tracker.state.value.copy(speedKmh = kmh, speedAt = System.currentTimeMillis())
 
         val moved = !anchorSet ||
             Geo.dist(anchorLat, anchorLon, l.latitude, l.longitude) > 40 || kmh > 8f
@@ -208,11 +210,11 @@ class TrackingService : Service() {
         )
         dao.updateTrip(nt)
         trip = nt
-        Tracker.state.value = Tracker.state.value.copy(distanceM = nt.distanceM, speedKmh = kmh)
+        Tracker.state.value = Tracker.state.value.copy(distanceM = nt.distanceM)
         val now = System.currentTimeMillis()
         if (now - lastNotif > 10_000) {
             lastNotif = now
-            Notifs.update(this@TrackingService, nt.distanceM, nt.startTime)
+            Notifs.update(this@TrackingService, nt.distanceM, nt.startTime, kmh)
         }
     }
 

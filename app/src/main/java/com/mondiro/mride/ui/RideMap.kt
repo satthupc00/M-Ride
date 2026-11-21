@@ -3,6 +3,8 @@ package com.mondiro.mride.ui
 import android.content.res.Resources
 import android.graphics.PointF
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
@@ -505,6 +507,45 @@ fun SpeedLegend(modifier: Modifier = Modifier) {
                     modifier = Modifier.align(androidx.compose.ui.BiasAlignment(v / maxV * 2f - 1f, 0f)),
                 )
             }
+        }
+    }
+}
+
+
+/** Màu theo tốc độ, nội suy theo cùng thang màu với đường đi. */
+fun speedColor(kmh: Float): androidx.compose.ui.graphics.Color {
+    val stops = SPEED_STOPS
+    if (kmh <= stops.first().first) return androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(stops.first().second))
+    for (i in 0 until stops.size - 1) {
+        val (v0, c0) = stops[i]
+        val (v1, c1) = stops[i + 1]
+        if (kmh <= v1) {
+            val f = (kmh - v0) / (v1 - v0)
+            return androidx.compose.ui.graphics.lerp(
+                androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(c0)),
+                androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(c1)), f,
+            )
+        }
+    }
+    return androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(stops.last().second))
+}
+
+/** Đồng hồ tốc độ tròn khi đang ghi: số km/h to, viền đổi màu theo tốc độ. */
+@Composable
+fun SpeedBubble(kmh: Float, modifier: Modifier = Modifier) {
+    val ring by androidx.compose.animation.animateColorAsState(speedColor(kmh), label = "ring")
+    Box(
+        modifier.size(88.dp)
+            .background(C.chrome.copy(alpha = .92f), androidx.compose.foundation.shape.CircleShape)
+            .border(4.dp, ring, androidx.compose.foundation.shape.CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "${kmh.toInt()}", fontSize = 30.sp, color = C.text,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+            )
+            Text("km/h", fontSize = 10.sp, color = C.muted)
         }
     }
 }

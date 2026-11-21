@@ -9,6 +9,7 @@ object Tracker {
         val startTime: Long = 0,
         val distanceM: Double = 0.0,
         val speedKmh: Float = 0f,
+        val speedAt: Long = 0,
         val auto: Boolean = false,
     )
 

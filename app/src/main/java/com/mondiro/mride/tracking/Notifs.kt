@@ -34,7 +34,7 @@ object Notifs {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    fun tracking(ctx: Context, distM: Double, start: Long): Notification {
+    fun tracking(ctx: Context, distM: Double, start: Long, kmh: Float? = null): Notification {
         val stop = PendingIntent.getService(
             ctx, 1,
             Intent(ctx, TrackingService::class.java).setAction(TrackingService.ACTION_STOP),
@@ -44,7 +44,9 @@ object Notifs {
             .setSmallIcon(R.drawable.ic_stat_ride)
             .setColor(0xFFE5383B.toInt())
             .setContentTitle("Đang ghi hành trình")
-            .setContentText("${Fmt.km(distM)} km · bắt đầu ${Fmt.hm(start)}")
+            .setContentText(
+                "${Fmt.km(distM)} km" + (kmh?.let { " · ${it.toInt()} km/h" } ?: "") + " · bắt đầu ${Fmt.hm(start)}"
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp(ctx))
@@ -53,10 +55,10 @@ object Notifs {
             .build()
     }
 
-    fun update(ctx: Context, distM: Double, start: Long) {
+    fun update(ctx: Context, distM: Double, start: Long, kmh: Float? = null) {
         if (!Perms.hasNotif(ctx)) return
         try {
-            NotificationManagerCompat.from(ctx).notify(TRACK_ID, tracking(ctx, distM, start))
+            NotificationManagerCompat.from(ctx).notify(TRACK_ID, tracking(ctx, distM, start, kmh))
         } catch (_: SecurityException) {
         }
     }

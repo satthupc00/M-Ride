@@ -121,6 +121,13 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
     val tick = rememberResumeTick()
     val fallback by produceState<GeoPoint?>(null, tick) { value = lastKnown(ctx) ?: value }
     val replayToday = { onReplay(ReplaySel(today.map { it.id }, "Hôm nay")) }
+    // Đồng hồ tốc độ: về 0 nếu quá 8 giây không có tín hiệu GPS mới (dừng xe / mất sóng)
+    var tickNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(rec.recording) {
+        if (!rec.recording) return@LaunchedEffect
+        while (true) { delay(1000); tickNow = System.currentTimeMillis() }
+    }
+    val liveKmh = if (rec.recording && tickNow - rec.speedAt < 8000) rec.speedKmh else 0f
 
     Box(Modifier.fillMaxSize()) {
         RideMap(
@@ -135,6 +142,9 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
                     .then(if (wide) Modifier.widthIn(max = 460.dp) else Modifier)
             )
             if (tracks.isNotEmpty()) SpeedLegend(Modifier.padding(start = 10.dp, top = 2.dp))
+        }
+        if (rec.recording) {
+            SpeedBubble(liveKmh, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 64.dp, end = 10.dp))
         }
         // Màn trong Z Fold: bảng gọn ở góc dưới trái, bản đồ chiếm toàn màn hình
         Column(

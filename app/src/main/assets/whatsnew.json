@@ -1,10 +1,9 @@
-{ "version": "1.0.13", "date": "2026-11-12",
+{ "version": "1.0.14", "date": "2026-11-21",
   "new": [
-    "Phát lại: nút \"⇄\" cạnh đồng hồ để đổi giữa giờ thực và thời gian đã đi tính từ lúc xuất phát",
-    "Nhãn giờ trên chấm xe cũng đổi theo chế độ đang chọn"
+    "Đồng hồ tốc độ hiện trên bản đồ khi đang ghi hành trình, viền đổi màu theo tốc độ",
+    "Thông báo khi đang ghi hiện thêm tốc độ hiện tại"
   ],
   "improved": [
-    "App nhớ chế độ đồng hồ bạn chọn cho lần xem sau",
-    "Trang chia sẻ cho bạn bè cũng có nút đổi giờ"
+    "Tốc độ về 0 khi dừng xe hoặc mất tín hiệu GPS quá 8 giây"
   ],
   "fixed": [] }
