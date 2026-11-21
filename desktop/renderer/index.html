@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>M Ride</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; worker-src blob: 'self'; child-src blob:; font-src 'self' https: data:">
+<link rel="stylesheet" href="../node_modules/maplibre-gl/dist/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <img class="brand-icon" src="icon.png" alt="">
+    <div class="brand-name"><span><span class="m">M</span> <span class="a">Ride</span></span><span class="latest" id="latestBadge" hidden>latest</span></div>
+  </div>
+  <button class="ibtn no-drag" id="sideBtn" title="Ẩn/hiện danh sách (Ctrl+B)" aria-label="Ẩn/hiện danh sách"></button>
+  <div class="trip-title" id="tripTitle"></div>
+  <div class="tools">
+    <button type="button" class="syncdot" id="syncDot" title="Chưa kết nối điện thoại" aria-label="Đồng bộ"><i></i></button>
+    <button type="button" class="ibtn" id="setBtn" title="Cài đặt" aria-label="Cài đặt"></button>
+    <button type="button" class="ibtn upd" id="updBtn" title="Kiểm tra cập nhật" aria-label="Kiểm tra cập nhật"></button>
+  </div>
+</header>
+
+<div class="body">
+  <aside class="side" id="side">
+    <div class="side-head"><b>Hành trình</b><span id="tripCount"></span></div>
+    <div class="list" id="list"></div>
+  </aside>
+  <main class="stage" id="stage">
+    <div id="map"></div>
+    <div class="empty" id="empty">
+      <h2>Chọn một hành trình bên trái</h2>
+      <p>Bấm vào một chuyến để xem lại trên bản đồ.</p>
+      <div class="keys">
+        <span><kbd>Space</kbd> Phát / tạm dừng</span><span><kbd>←</kbd><kbd>→</kbd> Tua 30 giây</span>
+        <span><kbd>F</kbd> Bám xe</span><span><kbd>R</kbd> Xoay theo xe</span><span><kbd>N</kbd> Hướng Bắc</span>
+        <span><kbd>H</kbd> Ẩn giao diện</span><span><kbd>1</kbd>–<kbd>5</kbd> Tốc độ phát</span><span><kbd>Ctrl</kbd>+<kbd>B</kbd> Danh sách</span>
+      </div>
+    </div>
+    <div class="legend" id="legend" hidden>Tốc độ (km/h)<div class="bar"></div>
+      <div class="ticks"><span style="left:0">0</span><span style="left:16.7%">10</span><span style="left:33.3%">20</span><span style="left:50%">30</span><span style="left:75%">45</span><span style="left:100%">60+</span></div></div>
+    <div class="dock" id="dock" hidden>
+      <div class="chips">
+        <button class="mchip round" id="hideBtn" title="Ẩn giao diện (H)" aria-label="Ẩn giao diện"></button>
+        <button class="mchip round" id="northBtn" title="Về hướng Bắc (N)" aria-label="Về hướng Bắc"></button>
+        <button class="mchip" id="rotBtn" title="Xoay bản đồ theo hướng xe (R)"></button>
+        <button class="mchip on" id="folBtn" title="Camera bám theo xe (F)"></button>
+      </div>
+      <section class="card">
+        <div class="stats" id="stats"></div>
+        <div class="ptop">
+          <div class="pl">
+            <div class="clockrow"><div class="clock" id="clock" title="Bấm để đổi giờ thực / thời gian đã đi">--:--:--</div><button class="ctog" id="ctog">⇄ Giờ thực</button></div>
+            <div class="meta" id="meta"></div>
+          </div>
+          <div class="spd"><b id="spd">0</b><small>km/h</small></div>
+        </div>
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Tua hành trình">
+        <div class="ctl">
+          <button class="play" id="playBtn" title="Phát / tạm dừng (Space)" aria-label="Phát / tạm dừng"></button>
+          <div class="rates" id="rates"></div>
+        </div>
+      </section>
+    </div>
+    <button class="restore" id="restoreBtn" title="Hiện giao diện (H)" aria-label="Hiện giao diện" hidden></button>
+  </main>
+</div>
+
+<footer class="foot">
+  <span id="status">Chưa kết nối điện thoại</span>
+  <span class="credit">Created by Mondiro</span>
+</footer>
+
+<!-- Màn ghép mã với điện thoại -->
+<div class="pair" id="pair" hidden>
+  <div class="dragstrip"></div>
+  <div class="pair-box">
+    <img src="icon.png" alt="" class="pair-logo">
+    <div class="brand-name big"><span><span class="m">M</span> <span class="a">Ride</span></span></div>
+    <p class="pair-lead">Kết nối với điện thoại để xem lại các hành trình</p>
+    <div class="code" id="pairCode">------</div>
+    <ol class="steps">
+      <li>Mở app <b>M Ride</b> trên điện thoại</li>
+      <li>Vào <b>Cài đặt → Kết nối máy tính</b></li>
+      <li>Nhập mã 6 số ở trên</li>
+    </ol>
+    <div class="pair-status" id="pairStatus">Đang tạo mã…</div>
+    <button class="btn ghost" id="pairNew">Tạo mã mới</button>
+  </div>
+  <span class="credit pair-credit">Created by Mondiro</span>
+</div>
+
+<!-- Cài đặt -->
+<div class="modal" id="setModal" hidden>
+  <div class="dialog">
+    <div class="dhead"><b>Cài đặt</b><button class="ibtn" data-close title="Đóng (Esc)" aria-label="Đóng"></button></div>
+    <div class="group"><div class="gt">Phiên bản</div>
+      <div class="vrow"><span class="brand-name small"><span><span class="m">M</span> <span class="a">Ride</span></span></span><span class="muted" id="verText"></span></div>
+      <div class="vstatus" id="verStatus"></div>
+      <div class="brow"><button class="btn ghost" id="wnBtn"></button><button class="btn ghost" id="chkBtn"></button><button class="btn red" id="instBtn" hidden></button></div>
+    </div>
+    <div class="group"><div class="gt">Điện thoại</div>
+      <div class="vstatus" id="pairInfo">Đã kết nối với điện thoại</div>
+      <div class="brow"><button class="btn ghost" id="unpairBtn">Ngắt kết nối</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- What's new -->
+<div class="modal" id="wnModal" hidden>
+  <div class="dialog">
+    <div class="dhead"><b>What's new</b><button class="ibtn" data-close title="Đóng (Esc)" aria-label="Đóng"></button></div>
+    <div id="wnBody"></div>
+  </div>
+</div>
+
+<!-- Có bản cập nhật -->
+<div class="modal" id="updModal" hidden>
+  <div class="dialog">
+    <div class="dhead"><b id="updTitle">Có bản mới</b><button class="ibtn" data-close title="Để sau (Esc)" aria-label="Đóng"></button></div>
+    <div id="updNotes" class="notes"></div>
+    <div class="prog" id="updProg" hidden><i></i></div>
+    <div class="brow"><button class="btn red" id="updGo">Cập nhật ngay</button><button class="btn ghost" data-close>Để sau</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../node_modules/maplibre-gl/dist/maplibre-gl.js"></script>
+<script src="../node_modules/firebase/firebase-app-compat.js"></script>
+<script src="../node_modules/firebase/firebase-auth-compat.js"></script>
+<script src="../node_modules/firebase/firebase-firestore-compat.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
