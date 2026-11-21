@@ -1,11 +1,6 @@
 package com.mondiro.mride.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,21 +53,15 @@ fun AppRoot() {
     val trips by remember { dao.observeTrips() }.collectAsState(initial = emptyList())
     var tab by rememberSaveable { mutableStateOf(Tab.Today) }
     var replay by remember { mutableStateOf<ReplaySel?>(null) }
-    // Màn trong: danh sách hành trình thu vào khi đã chọn chuyến, để bản đồ chiếm toàn màn hình
-    var listOpen by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(Unit) { Updater.check(showIfNew = true) }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(C.chrome)) {
         val wide = maxWidth >= 600.dp
         BackHandler(enabled = replay != null || tab != Tab.Today) {
-            when {
-                wide && tab == Tab.Trips && !listOpen -> listOpen = true
-                replay != null && !(wide && tab == Tab.Trips) -> replay = null
-                else -> { replay = null; tab = Tab.Today }
-            }
+            if (replay != null) replay = null else tab = Tab.Today
         }
-        val openReplay: (ReplaySel) -> Unit = { replay = it; if (wide) { tab = Tab.Trips; listOpen = false } }
+        val openReplay: (ReplaySel) -> Unit = { replay = it; if (wide) tab = Tab.Trips }
 
         if (!wide) {
             Column(Modifier.fillMaxSize()) {
@@ -90,7 +79,7 @@ fun AppRoot() {
                     }
                     if (r == null && tab == Tab.Trips) Credit(Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(6.dp))
                 }
-                NavigationBar(containerColor = C.chrome, tonalElevation = 0.dp) {
+                if (!UiFlags.immersive.value) NavigationBar(containerColor = C.chrome, tonalElevation = 0.dp) {
                     Tab.entries.forEach { t ->
                         val on = tab == t && (replay == null || t == Tab.Trips) || (replay != null && t == Tab.Trips)
                         NavigationBarItem(
@@ -108,12 +97,12 @@ fun AppRoot() {
             }
         } else {
             Row(Modifier.fillMaxSize()) {
-                NavigationRail(containerColor = C.chrome, modifier = Modifier.width(84.dp)) {
+                if (!UiFlags.immersive.value) NavigationRail(containerColor = C.chrome, modifier = Modifier.width(84.dp)) {
                     Spacer(Modifier.size(36.dp))
                     Tab.entries.forEach { t ->
                         NavigationRailItem(
                             selected = tab == t,
-                            onClick = { if (t == Tab.Trips && tab == Tab.Trips) listOpen = true; tab = t; if (t != Tab.Trips) replay = null },
+                            onClick = { tab = t; replay = null },
                             icon = { Icon(painterResource(t.icon), t.label, Modifier.size(22.dp)) },
                             label = { Text(t.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
                             colors = NavigationRailItemDefaults.colors(
@@ -125,41 +114,23 @@ fun AppRoot() {
                     Spacer(Modifier.weight(1f))
                     Box(Modifier.padding(bottom = 16.dp)) { AppName(13) }
                 }
-                VerticalDivider(color = C.line)
+                if (!UiFlags.immersive.value) VerticalDivider(color = C.line)
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     when (tab) {
                         Tab.Today -> TodayScreen(true, trips, openReplay)
+                        // Giống màn ngoài: danh sách toàn màn hình; chọn chuyến thì bản đồ phát lại toàn màn hình
                         Tab.Trips -> {
-                            val sel = replay ?: trips.firstOrNull()?.let { ReplaySel(listOf(it.id), it.name) }
-                            val showList = listOpen || sel == null
-                            Row(Modifier.fillMaxSize()) {
-                                AnimatedVisibility(
-                                    visible = showList,
-                                    enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-                                    exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut(),
-                                ) {
-                                    Row {
-                                        TripsList(
-                                            trips, sel?.ids ?: emptyList(),
-                                            onTrip = { replay = ReplaySel(listOf(it.id), it.name); listOpen = false },
-                                            onDay = { list, title -> replay = ReplaySel(list.map { it.id }, title); listOpen = false },
-                                            modifier = Modifier.width(340.dp),
-                                        )
-                                        VerticalDivider(color = C.line)
-                                    }
-                                }
-                                Box(Modifier.weight(1f).fillMaxHeight()) {
-                                    if (sel != null) {
-                                        ReplayView(
-                                            sel, compact = false,
-                                            onBack = if (showList) null else ({ listOpen = true }),
-                                            onDeleted = { replay = null; listOpen = true },
-                                        )
-                                    } else {
-                                        Box(Modifier.fillMaxSize().background(C.chrome)) {
-                                            Credit(Modifier.align(Alignment.BottomEnd).padding(10.dp))
-                                        }
-                                    }
+                            val r = replay
+                            if (r != null) {
+                                ReplayView(r, compact = false, onBack = { replay = null }, onDeleted = { replay = null })
+                            } else {
+                                Box(Modifier.fillMaxSize()) {
+                                    TripsList(
+                                        trips, emptyList(),
+                                        onTrip = { replay = ReplaySel(listOf(it.id), it.name) },
+                                        onDay = { list, title -> replay = ReplaySel(list.map { it.id }, title) },
+                                    )
+                                    Credit(Modifier.align(Alignment.BottomEnd).padding(10.dp))
                                 }
                             }
                         }

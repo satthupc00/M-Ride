@@ -1,9 +1,12 @@
-{ "version": "1.0.14", "date": "2026-11-21",
+{ "version": "1.0.15", "date": "2026-11-21",
   "new": [
-    "Đồng hồ tốc độ hiện trên bản đồ khi đang ghi hành trình, viền đổi màu theo tốc độ",
-    "Thông báo khi đang ghi hiện thêm tốc độ hiện tại"
+    "Phát lại: nút con mắt để ẩn hết giao diện, chỉ còn bản đồ và xe; chạm bản đồ để hiện lại",
+    "Đồng hồ tốc độ hình vòng cung gắn ngay trên bảng Hôm nay, chỉ hiện khi đang ghi"
   ],
   "improved": [
-    "Tốc độ về 0 khi dừng xe hoặc mất tín hiệu GPS quá 8 giây"
+    "Màn trong Z Fold: tab Hành trình giống màn ngoài — danh sách toàn màn hình (2 cột), chọn chuyến thì bản đồ phát lại toàn màn hình",
+    "Đồng hồ tốc độ không còn che bản đồ và vị trí xe"
   ],
-  "fixed": [] }
+  "fixed": [
+    "Sửa lỗi bản đồ phát lại bị ép hẹp và các nút bị méo trên màn trong"
+  ] }

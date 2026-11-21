@@ -66,6 +66,11 @@ object C {
     val track = Color(0xFF474C55)
 }
 
+/** Chế độ toàn màn hình khi phát lại (ẩn thanh điều hướng của app). */
+object UiFlags {
+    val immersive = androidx.compose.runtime.mutableStateOf(false)
+}
+
 object Fmt {
     private val vi = Locale("vi", "VN")
     const val DAY = 86_400_000L

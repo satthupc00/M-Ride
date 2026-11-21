@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -132,12 +134,15 @@ fun TripsList(
             }
             return@Column
         }
-        LazyColumn(
+        // 1 cột ở màn ngoài, 2 cột ở màn trong (đỡ trống khi danh sách chiếm toàn màn hình)
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(340.dp),
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 36.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             for ((day, list) in groups) {
-                item(key = "d$day") {
+                item(key = "d$day", span = { GridItemSpan(maxLineSpan) }) {
                     val title = Fmt.day(day)
                     Row(
                         Modifier.fillMaxWidth().padding(start = 4.dp, end = 0.dp, top = 10.dp, bottom = 2.dp),

@@ -2,6 +2,11 @@ package com.mondiro.mride.ui
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
+import androidx.compose.runtime.DisposableEffect
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import com.mondiro.mride.data.Prefs
 import androidx.compose.runtime.collectAsState
@@ -171,6 +176,22 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var rate by remember { mutableIntStateOf(60) }
     var askDelete by remember { mutableStateOf(false) }
     var sharing by remember { mutableStateOf(false) }
+    // Ẩn hết giao diện, chỉ còn bản đồ + xe (chạm bản đồ hoặc nút con mắt để hiện lại)
+    var hideUi by remember(sel) { mutableStateOf(false) }
+    BackHandler(enabled = hideUi) { hideUi = false }
+    DisposableEffect(hideUi) {
+        UiFlags.immersive.value = hideUi
+        val act = ctx.findActivity()
+        val ctl = act?.let { WindowCompat.getInsetsController(it.window, it.window.decorView) }
+        if (hideUi) {
+            ctl?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            ctl?.hide(WindowInsetsCompat.Type.systemBars())
+        } else ctl?.show(WindowInsetsCompat.Type.systemBars())
+        onDispose {
+            UiFlags.immersive.value = false
+            ctl?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
     var follow by remember(sel) { mutableStateOf(true) }
     var rotate by remember { mutableStateOf(false) }
     var camBearing by remember(sel) { mutableDoubleStateOf(0.0) }
@@ -225,7 +246,8 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             progress = if (ready) data!!.remaining(t) else null,
             progressGrey = true,
             dot = if (ready) data!!.pos(t) else null,
-            fitKey = data, bottomPadFrac = 0.30,
+            fitKey = data, bottomPadFrac = if (hideUi) 0.06 else 0.30,
+            onMapTap = { if (hideUi) hideUi = false },
             follow = follow && ready,
             bearing = if ((rotate || northAnim) && ready) camBearing else null,
             dotLabel = if (!ready) null
@@ -237,6 +259,15 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             northTick = northTick,
             onUserGesture = { follow = false },
         )
+        if (hideUi) {
+            val round = CircleShape
+            Box(
+                Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(14.dp).size(44.dp)
+                    .pressable(round) { hideUi = false }.background(C.chrome.copy(alpha = .6f), round),
+                contentAlignment = Alignment.Center,
+            ) { Icon(painterResource(R.drawable.ic_eye), "Hiện giao diện", Modifier.size(20.dp), tint = Color.White) }
+        }
+        if (!hideUi) {
         TopFade()
         TopBar {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -304,6 +335,13 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                 ) {
                     val round = CircleShape
                     Box(
+                        Modifier.size(40.dp).pressable(round) { hideUi = true }
+                            .background(C.chrome.copy(alpha = .92f), round),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(painterResource(R.drawable.ic_eye_off), "Ẩn giao diện", Modifier.size(19.dp), tint = Color.White)
+                    }
+                    Box(
                         Modifier.size(40.dp).pressable(round) {
                             rotate = false
                             if (follow) northAnim = true else northTick++
@@ -321,7 +359,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                         if (rotate) follow = true
                     }
                     MapChip(
-                        if (follow) "Đang bám xe" else "Bám theo xe",
+                        "Bám xe",
                         if (follow) R.drawable.ic_navigation_on else R.drawable.ic_navigation, follow,
                     ) { follow = !follow }
                 }
@@ -394,6 +432,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                 }
             }
             Credit(Modifier.align(Alignment.End).padding(top = 3.dp, bottom = 3.dp, end = 2.dp))
+        }
         }
     }
 

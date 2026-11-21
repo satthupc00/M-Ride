@@ -245,6 +245,7 @@ fun RideMap(
     onUserRotate: (() -> Unit)? = null,
     cam: MapCam? = null,
     northTick: Int = 0,
+    onMapTap: (() -> Unit)? = null,
     speeds: List<List<Float>>? = null,
     progressGrey: Boolean = false,
 ) {
@@ -254,6 +255,7 @@ fun RideMap(
     val rotateCb by rememberUpdatedState(onUserRotate)
     val camRef by rememberUpdatedState(cam)
     val tracksRef by rememberUpdatedState(tracks)
+    val mapTapCb by rememberUpdatedState(onMapTap)
     var followAnimUntil by remember { mutableLongStateOf(0L) }
     val dark by Prefs.mapDark.collectAsState()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -314,18 +316,22 @@ fun RideMap(
             m.addOnCameraMoveListener { camRef?.bearing = m.cameraPosition.bearing }
             // Chạm vào đường đi → báo vị trí điểm gần nhất để tua tới đó
             m.addOnMapClickListener { ll ->
-                val cb = tapCb ?: return@addOnMapClickListener false
-                val pts = tracksRef.firstOrNull() ?: return@addOnMapClickListener false
-                val tap = m.projection.toScreenLocation(ll)
-                var best = -1
-                var bd = Float.MAX_VALUE
-                pts.forEachIndexed { k, g ->
-                    val q = m.projection.toScreenLocation(LatLng(g.latitude, g.longitude))
-                    val dd = (q.x - tap.x) * (q.x - tap.x) + (q.y - tap.y) * (q.y - tap.y)
-                    if (dd < bd) { bd = dd; best = k }
+                val cb = tapCb
+                val pts = tracksRef.firstOrNull()
+                if (cb != null && pts != null) {
+                    val tap = m.projection.toScreenLocation(ll)
+                    var best = -1
+                    var bd = Float.MAX_VALUE
+                    pts.forEachIndexed { k, g ->
+                        val q = m.projection.toScreenLocation(LatLng(g.latitude, g.longitude))
+                        val dd = (q.x - tap.x) * (q.x - tap.x) + (q.y - tap.y) * (q.y - tap.y)
+                        if (dd < bd) { bd = dd; best = k }
+                    }
+                    val lim = 30 * density
+                    if (best >= 0 && bd < lim * lim) { cb(best); return@addOnMapClickListener true }
                 }
-                val lim = 30 * density
-                if (best >= 0 && bd < lim * lim) { cb(best); true } else false
+                mapTapCb?.invoke()
+                false
             }
             map = m
         }
@@ -421,7 +427,7 @@ fun RideMap(
     }
 
     // Bật bám xe: chừa chỗ cho bảng điều khiển phía dưới rồi phóng to mượt vào xe
-    LaunchedEffect(map, follow, dot != null) {
+    LaunchedEffect(map, follow, dot != null, bottomPadFrac) {
         val m = map ?: return@LaunchedEffect
         if (follow) {
             val d = dot ?: return@LaunchedEffect
@@ -541,6 +547,41 @@ fun SpeedBubble(kmh: Float, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.foundation.layout.Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "${kmh.toInt()}", fontSize = 30.sp, color = C.text,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+            )
+            Text("km/h", fontSize = 10.sp, color = C.muted)
+        }
+    }
+}
+
+
+/** Đồng hồ tốc độ hình vòng cung, gắn ngay trên bảng "Hôm nay" (chỉ hiện khi đang ghi). */
+@Composable
+fun SpeedGauge(kmh: Float, modifier: Modifier = Modifier) {
+    val col by androidx.compose.animation.animateColorAsState(speedColor(kmh), label = "gc")
+    val frac by androidx.compose.animation.core.animateFloatAsState((kmh / 80f).coerceIn(0f, 1f), label = "gf")
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 80.dp, topEnd = 80.dp)
+    Box(
+        modifier.width(156.dp).height(88.dp).background(C.panel.copy(alpha = .97f), shape),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        androidx.compose.foundation.Canvas(
+            Modifier.matchParentSize().padding(start = 14.dp, end = 14.dp, top = 12.dp)
+        ) {
+            val sw = 9.dp.toPx()
+            val d = size.width - sw
+            val tl = androidx.compose.ui.geometry.Offset(sw / 2, sw / 2)
+            val sz = androidx.compose.ui.geometry.Size(d, d)
+            val st = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            drawArc(C.track, 180f, 180f, false, tl, sz, style = st)
+            if (frac > 0.005f) drawArc(col, 180f, 180f * frac, false, tl, sz, style = st)
+        }
+        androidx.compose.foundation.layout.Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(bottom = 4.dp),
+        ) {
             Text(
                 "${kmh.toInt()}", fontSize = 30.sp, color = C.text,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,

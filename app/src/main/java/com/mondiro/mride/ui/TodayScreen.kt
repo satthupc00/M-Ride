@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -143,9 +144,6 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
             )
             if (tracks.isNotEmpty()) SpeedLegend(Modifier.padding(start = 10.dp, top = 2.dp))
         }
-        if (rec.recording) {
-            SpeedBubble(liveKmh, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 64.dp, end = 10.dp))
-        }
         // Màn trong Z Fold: bảng gọn ở góc dưới trái, bản đồ chiếm toàn màn hình
         Column(
             Modifier.align(if (wide) Alignment.BottomStart else Alignment.BottomCenter)
@@ -153,6 +151,10 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
                 .padding(horizontal = 10.dp)
                 .then(if (wide) Modifier.widthIn(max = 460.dp) else Modifier)
         ) {
+            // Đồng hồ tốc độ gắn trên bảng, chỉ hiện khi đang ghi
+            if (rec.recording) {
+                SpeedGauge(liveKmh, Modifier.align(Alignment.CenterHorizontally).offset(y = 1.dp))
+            }
             Card {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.Bottom) {
