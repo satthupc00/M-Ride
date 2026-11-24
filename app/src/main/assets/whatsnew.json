@@ -1,6 +1,10 @@
-{ "version": "1.0.16", "date": "2026-11-21",
+{ "version": "1.0.17", "date": "2026-11-24",
   "new": [
-    "Update Administrator"
+    "Nút \"Bám xe\" trên bản đồ khi đang ghi: camera chạy mượt theo vị trí của bạn"
   ],
-  "improved": [],
-  "fixed": [] }
+  "improved": [
+    "Tự ghi lại đáng tin cậy hơn: vẫn tự bật ghi khi tiếp tục đi xe sau lúc nghỉ hoặc sau khi bấm Dừng (chờ 3 phút)"
+  ],
+  "fixed": [
+    "Sửa lỗi đường màu theo tốc độ bị đứt đoạn và biến mất khi thu nhỏ bản đồ"
+  ] }

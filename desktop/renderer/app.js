@@ -111,6 +111,20 @@ function renderList() {
 }
 
 /* ---------- phát lại ---------- */
+// gộp các điểm liền nhau có tốc độ gần nhau (bước 3 km/h) thành một nét — nét dài không bị mất khi zoom xa
+function speedRuns(coords, ss) {
+  const feats = []; if (coords.length < 2) return {type: 'FeatureCollection', features: feats};
+  const bk = i => Math.round(((ss[i] + ss[i + 1]) / 2) / 3);
+  let run = [coords[0], coords[1]], b = bk(0);
+  for (let i = 1; i < coords.length - 1; i++) {
+    const nb = bk(i);
+    if (nb !== b) { feats.push({type: 'Feature', properties: {s: b * 3}, geometry: {type: 'LineString', coordinates: run}}); run = [coords[i]]; b = nb; }
+    run.push(coords[i + 1]);
+  }
+  feats.push({type: 'Feature', properties: {s: b * 3}, geometry: {type: 'LineString', coordinates: run}});
+  return {type: 'FeatureCollection', features: feats};
+}
+
 let map = null, mapReady = false, R = null;    // R: dữ liệu chuyến đang phát
 let t = 0, playing = true, rate = 60, follow = true, rotate = false, camB = 0, toNorth = false, followLock = 0, hidden = false;
 let showElapsed = store.get('mr-elapsed') === '1';
@@ -131,7 +145,7 @@ function buildReplay(ids) {
   const clock = x => { const i = idx(x); if (i >= n - 1) return times[n - 1]; return times[i] + (times[i + 1] - times[i]) * frac(i, x); };
   const speed = x => { const i = idx(x); if (i >= n - 1) return speeds[n - 1] || 0; return speeds[i] + (speeds[i + 1] - speeds[i]) * frac(i, x); };
   const heading = x => { const a = pos(x), b = pos(Math.min(total, x + 10)); const dy = b[1] - a[1], dx = (b[0] - a[0]) * Math.cos(a[1] * Math.PI / 180); if (Math.hypot(dx, dy) < 3e-5) return null; return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360; };
-  const segs = {type: 'FeatureCollection', features: coords.slice(0, -1).map((c, i) => ({type: 'Feature', properties: {s: (ss[i] + ss[i + 1]) / 2}, geometry: {type: 'LineString', coordinates: [c, coords[i + 1]]}}))};
+  const segs = speedRuns(coords, ss);
   return {sel, coords, times, n, vt, total, idx, pos, clock, speed, heading, segs,
     dist: sel.reduce((a, x) => a + x.dist, 0), max: Math.max(0, ...sel.map(x => x.max)), start: times[0], end: times[n - 1],
     moving: sel.reduce((a, x) => a + (x.end - x.start), 0)};
@@ -188,7 +202,7 @@ function ensureMap() {
       if (l.type !== 'symbol' || !nameLayers.has(l['source-layer']) || /shield|housenumber|ref/.test(l.id)) continue;
       try { map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:vi'], ['get', 'name'], ['get', 'name:latin']]); } catch (e) {}
     }
-    ['route', 'prog', 'start', 'dot'].forEach(s => map.addSource(s, {type: 'geojson', data: fc([])}));
+    ['route', 'prog', 'start', 'dot'].forEach(s => map.addSource(s, {type: 'geojson', data: fc([]), tolerance: 0}));
     const L = {'line-cap': 'round', 'line-join': 'round'};
     map.addLayer({id: 'route-casing', type: 'line', source: 'route', layout: L, paint: {'line-color': '#2A2C31', 'line-width': 7.5}});
     map.addLayer({id: 'route', type: 'line', source: 'route', layout: L, paint: {'line-color': SPEED_COLOR, 'line-width': 5}});

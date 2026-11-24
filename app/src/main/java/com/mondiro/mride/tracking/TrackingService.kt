@@ -95,6 +95,7 @@ class TrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            Prefs.manualStopAt = System.currentTimeMillis()
             if (!started) {
                 stopSelf()
             } else {

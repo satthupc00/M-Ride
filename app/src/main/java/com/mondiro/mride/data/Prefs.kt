@@ -27,6 +27,11 @@ object Prefs {
     fun setClockElapsed(v: Boolean) { clockElapsed.value = v; sp.edit().putBoolean("clockElapsed", v).apply() }
     fun setMapDark(v: Boolean) { mapDark.value = v; sp.edit().putBoolean("mapDark2", v).apply() }
 
+    /** Lúc người dùng tự bấm Dừng — sau đó chờ 3 phút mới tự ghi lại. */
+    var manualStopAt: Long
+        get() = if (::sp.isInitialized) sp.getLong("manualStopAt", 0L) else 0L
+        set(v) { sp.edit().putLong("manualStopAt", v).apply() }
+
     fun deletedUuids(): Set<String> = sp.getStringSet("deleted", emptySet()) ?: emptySet()
     fun addDeleted(uuid: String) {
         sp.edit().putStringSet("deleted", deletedUuids() + uuid).apply()

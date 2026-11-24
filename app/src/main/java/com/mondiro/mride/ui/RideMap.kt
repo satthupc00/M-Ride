@@ -53,11 +53,13 @@ import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import kotlin.math.roundToInt
 
 /** Góc xoay hiện tại của bản đồ (cập nhật liên tục, không gây vẽ lại giao diện). */
 class MapCam { var bearing: Double = 0.0 }
@@ -95,15 +97,28 @@ fun smoothSpeeds(v: List<Float>, w: Int = 3): List<Float> = v.indices.map { i ->
     if (n == 0) 0f else sum / n
 }
 
+/**
+ * Đường tô màu theo tốc độ: gộp các điểm liền nhau có tốc độ gần nhau (bước 3 km/h) thành một nét dài.
+ * Nét dài không bị bản đồ lược bỏ khi zoom xa (trước đây mỗi đoạn nối 2 điểm GPS quá ngắn nên bị mất).
+ */
 private fun speedSegments(tracks: List<List<GeoPoint>>, speeds: List<List<Float>>): FeatureCollection {
     val feats = ArrayList<Feature>()
     tracks.forEachIndexed { k, t ->
         val sp = speeds.getOrNull(k) ?: return@forEachIndexed
-        for (i in 0 until t.size - 1) {
-            val f = Feature.fromGeometry(lineOf(listOf(t[i], t[i + 1])))
-            f.addNumberProperty("s", ((sp.getOrElse(i) { 0f } + sp.getOrElse(i + 1) { 0f }) / 2f))
-            feats.add(f)
+        if (t.size < 2) return@forEachIndexed
+        fun bucket(i: Int) = (((sp.getOrElse(i) { 0f } + sp.getOrElse(i + 1) { 0f }) / 2f) / 3f).roundToInt()
+        var run = arrayListOf(t[0], t[1])
+        var b = bucket(0)
+        for (i in 1 until t.size - 1) {
+            val nb = bucket(i)
+            if (nb != b) {
+                feats.add(Feature.fromGeometry(lineOf(run)).also { it.addNumberProperty("s", b * 3f) })
+                run = arrayListOf(t[i])
+                b = nb
+            }
+            run.add(t[i + 1])
         }
+        feats.add(Feature.fromGeometry(lineOf(run)).also { it.addNumberProperty("s", b * 3f) })
     }
     return FeatureCollection.fromFeatures(feats)
 }
@@ -120,7 +135,10 @@ private fun pointFc(p: GeoPoint?, label: String? = null): FeatureCollection =
     }))
 
 private fun addRideLayers(s: Style) {
-    for (id in listOf("tracks", "progress", "start", "dot")) s.addSource(GeoJsonSource(id, emptyFc()))
+    // tolerance 0: không lược bớt điểm của đường đi khi zoom xa
+    val keep = GeoJsonOptions().withTolerance(0f)
+    for (id in listOf("tracks", "progress")) s.addSource(GeoJsonSource(id, emptyFc(), keep))
+    for (id in listOf("start", "dot")) s.addSource(GeoJsonSource(id, emptyFc()))
     s.addLayer(
         LineLayer("tracks-glow", "tracks").withProperties(
             PropertyFactory.lineColor(RED), PropertyFactory.lineWidth(11f), PropertyFactory.lineOpacity(0.22f),
@@ -248,6 +266,7 @@ fun RideMap(
     onMapTap: (() -> Unit)? = null,
     speeds: List<List<Float>>? = null,
     progressGrey: Boolean = false,
+    followSmooth: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val gestureCb by rememberUpdatedState(onUserGesture)
@@ -410,7 +429,8 @@ fun RideMap(
                     )
                 )
             } else {
-                m.moveCamera(CameraUpdateFactory.newLatLng(target))
+                if (followSmooth) m.animateCamera(CameraUpdateFactory.newLatLng(target), 900)
+                else m.moveCamera(CameraUpdateFactory.newLatLng(target))
             }
         }
     }

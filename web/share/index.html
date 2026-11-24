@@ -194,6 +194,20 @@ function demo() {
     _coords: dense, _ts: dense.map((_, i) => i * 7.5), _sp: dense.map((_, i) => Math.round(22 + 12 * Math.sin(i / 9))) };
 }
 
+// gộp các điểm liền nhau có tốc độ gần nhau (bước 3 km/h) thành một nét — nét dài không bị mất khi zoom xa
+function speedRuns(coords, ss) {
+  const feats = []; if (coords.length < 2) return {type: 'FeatureCollection', features: feats};
+  const bk = i => Math.round(((ss[i] + ss[i + 1]) / 2) / 3);
+  let run = [coords[0], coords[1]], b = bk(0);
+  for (let i = 1; i < coords.length - 1; i++) {
+    const nb = bk(i);
+    if (nb !== b) { feats.push({type: 'Feature', properties: {s: b * 3}, geometry: {type: 'LineString', coordinates: run}}); run = [coords[i]]; b = nb; }
+    run.push(coords[i + 1]);
+  }
+  feats.push({type: 'Feature', properties: {s: b * 3}, geometry: {type: 'LineString', coordinates: run}});
+  return {type: 'FeatureCollection', features: feats};
+}
+
 (async function main() {
   const id = new URLSearchParams(location.search).get('id');
   if (!id) return showState('Không có hành trình', 'Link này thiếu mã hành trình.');
@@ -255,8 +269,7 @@ function demo() {
   const fc = feats => ({type: 'FeatureCollection', features: feats});
   // tốc độ làm mượt → tô màu từng đoạn: chậm đỏ, nhanh xanh dương
   const ss = coords.map((_, i) => { let a = 0, c = 0; for (let k = Math.max(0, i - 3); k <= Math.min(n - 1, i + 3); k++) { a += sp[k] || 0; c++; } return a / c; });
-  const segs = fc(coords.slice(0, -1).map((c, i) => ({type: 'Feature', properties: {s: (ss[i] + ss[i + 1]) / 2},
-    geometry: {type: 'LineString', coordinates: [c, coords[i + 1]]}})));
+  const segs = speedRuns(coords, ss);
   const SPEED_COLOR = ['interpolate', ['linear'], ['get', 's'], 0, '#E5383B', 10, '#F28C28', 20, '#F5C842', 30, '#2EB872', 45, '#1FB5C9', 60, '#3D7BFF'];
   const pt = c => ({type: 'Feature', geometry: {type: 'Point', coordinates: c}, properties: {}});
   const ln = cs => ({type: 'Feature', geometry: {type: 'LineString', coordinates: cs}, properties: {}});
@@ -269,8 +282,8 @@ function demo() {
       if (l.type !== 'symbol' || !nameLayers.has(l['source-layer']) || /shield|housenumber|ref/.test(l.id)) continue;
       try { map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name:vi'], ['get', 'name'], ['get', 'name:latin']]); } catch (e) {}
     }
-    map.addSource('route', {type: 'geojson', data: segs});
-    map.addSource('prog', {type: 'geojson', data: fc([])});
+    map.addSource('route', {type: 'geojson', data: segs, tolerance: 0});
+    map.addSource('prog', {type: 'geojson', data: fc([]), tolerance: 0});
     map.addSource('start', {type: 'geojson', data: pt(coords[0])});
     map.addSource('dot', {type: 'geojson', data: pt(coords[0])});
     const lineLayout = {'line-cap': 'round', 'line-join': 'round'};

@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -128,14 +131,37 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
         if (!rec.recording) return@LaunchedEffect
         while (true) { delay(1000); tickNow = System.currentTimeMillis() }
     }
+    var followLive by remember { mutableStateOf(true) }
+    LaunchedEffect(rec.recording) { if (rec.recording) followLive = true }
     val liveKmh = if (rec.recording && tickNow - rec.speedAt < 8000) rec.speedKmh else 0f
 
     Box(Modifier.fillMaxSize()) {
         RideMap(
             Modifier.fillMaxSize(), tracks, dot = live, fitKey = today.size,
             fallbackCenter = fallback, bottomPadFrac = if (wide) 0.30 else 0.34, speeds = speeds,
+            // Bám xe khi đang ghi: camera chạy mượt theo vị trí; kéo bản đồ thì tạm tắt
+            follow = rec.recording && followLive && live != null,
+            followSmooth = true,
+            onUserGesture = { followLive = false },
         )
         TopFade()
+        if (rec.recording) {
+            val shape = RoundedCornerShape(20.dp)
+            Row(
+                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 62.dp, end = 10.dp)
+                    .pressable(shape) { followLive = !followLive }
+                    .background(if (followLive) C.red else C.chrome.copy(alpha = .92f), shape)
+                    .padding(start = 11.dp, end = 13.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.ui.res.painterResource(if (followLive) R.drawable.ic_navigation_on else R.drawable.ic_navigation),
+                    null, Modifier.size(15.dp), tint = androidx.compose.ui.graphics.Color.White,
+                )
+                Text("Bám xe", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = androidx.compose.ui.graphics.Color.White)
+            }
+        }
         Column(Modifier.fillMaxWidth()) {
             TopBar { if (rec.recording) RecPill(rec.startTime, now) }
             PermissionCard(

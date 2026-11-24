@@ -1,9 +1,6 @@
-{ "version": "1.0.0", "date": "2026-11-21",
-  "new": [
-    "Bản M Ride cho máy tính: xem lại các hành trình đã ghi trên điện thoại",
-    "Bản đồ lớn, đường đi tô màu theo tốc độ, bám xe, xoay theo xe, tua nhanh 1×–120×",
-    "Phím tắt: Space phát/dừng, ←/→ tua, F bám xe, R xoay, N hướng Bắc, H ẩn giao diện",
-    "Update Administrator"
-  ],
+{ "version": "1.0.1", "date": "2026-11-24",
+  "new": [],
   "improved": [],
-  "fixed": [] }
+  "fixed": [
+    "Sửa lỗi đường màu theo tốc độ bị đứt đoạn và biến mất khi thu nhỏ bản đồ"
+  ] }
