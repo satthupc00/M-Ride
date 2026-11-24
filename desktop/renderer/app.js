@@ -382,8 +382,11 @@ async function installUpdate() {
   if (!API || !upd) return;
   $('updGo').disabled = true; $('updProg').hidden = false;
   API.onProgress(p => { $('updProg').firstElementChild.style.width = Math.round(p * 100) + '%'; });
-  const ok = await API.installUpdate();
-  if (!ok) { $('updGo').disabled = false; toast('Tải bản cập nhật bị lỗi'); }
+  const r = await API.installUpdate();
+  if (!r || !r.ok) {
+    $('updGo').disabled = false; $('updProg').hidden = true;
+    toast(`Tải bản cập nhật bị lỗi${r && r.msg ? ' (' + r.msg + ')' : ''}. Đã mở trang tải về trong trình duyệt.`);
+  }
 }
 
 /* ---------- kết nối điện thoại (ghép mã) ---------- */

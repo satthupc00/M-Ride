@@ -1,5 +1,5 @@
 // M Ride (PC) — tiến trình chính: cửa sổ, nhớ kích thước, cập nhật tự động từ GitHub Releases (tag pc-v*)
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -63,7 +63,7 @@ ipcMain.handle('upd:check', async () => {
     const v = rel.tag_name.replace(/^pc-v/, '');
     const asset = (rel.assets || []).find(a => /\.exe$/i.test(a.name));
     if (asset && newer(v, app.getVersion())) {
-      pending = { version: v, url: asset.browser_download_url, name: asset.name };
+      pending = { version: v, url: asset.browser_download_url, name: asset.name, size: asset.size || 0, page: rel.html_url };
       return { status: 'available', version: v, notes: rel.body || '' };
     }
     return { status: 'latest' };
@@ -72,30 +72,46 @@ ipcMain.handle('upd:check', async () => {
   }
 });
 
+function logUpd(msg) {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'update.log'), `[${new Date().toISOString()}] ${msg}\n`); } catch (e) {}
+}
+
 ipcMain.handle('upd:install', async e => {
-  if (!pending) return false;
+  if (!pending) return { ok: false, msg: 'Không có bản mới' };
+  const dir = path.join(app.getPath('userData'), 'updates');
+  const file = path.join(dir, pending.name);
   try {
-    const file = path.join(os.tmpdir(), pending.name);
-    const r = await fetch(pending.url, { headers: { 'User-Agent': 'M-Ride-PC' } });
-    if (!r.ok || !r.body) return false;
-    const total = Number(r.headers.get('content-length')) || 0;
-    const out = fs.createWriteStream(file);
-    const reader = r.body.getReader();
+    fs.mkdirSync(dir, { recursive: true });
+    // net.fetch dùng mạng của Chromium: theo proxy/chứng chỉ của Windows, tự đi theo chuyển hướng của GitHub
+    const r = await net.fetch(pending.url, { headers: { 'User-Agent': 'M-Ride-PC' } });
+    if (!r.ok || !r.body) throw new Error('HTTP ' + r.status);
+    const total = Number(r.headers.get('content-length')) || pending.size || 0;
+    const fh = await fs.promises.open(file, 'w');
     let got = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      out.write(Buffer.from(value));
-      got += value.length;
-      if (total) e.sender.send('upd:progress', got / total);
+    try {
+      const reader = r.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await fh.write(Buffer.from(value));
+        got += value.length;
+        if (total) e.sender.send('upd:progress', Math.min(1, got / total));
+      }
+    } finally {
+      await fh.close();                      // đóng hẳn file trước khi chạy bộ cài
     }
-    await new Promise(res => out.end(res));
-    // cài im lặng rồi tự mở lại app
-    spawn(file, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
-    setTimeout(() => app.quit(), 400);
-    return true;
+    if (pending.size && got < pending.size) throw new Error(`Tải thiếu (${got}/${pending.size})`);
+    logUpd(`downloaded ${got} bytes -> ${file}`);
+    // cài im lặng rồi tự mở lại app; nếu không chạy được thì mở bộ cài cho người dùng tự bấm
+    const child = spawn(file, ['/S', '--force-run'], { detached: true, stdio: 'ignore' });
+    child.on('error', err => { logUpd('spawn error: ' + err.message); shell.openPath(file); });
+    child.unref();
+    setTimeout(() => app.quit(), 800);
+    return { ok: true };
   } catch (err) {
-    return false;
+    logUpd('install error: ' + (err && err.stack || err));
+    if (pending.page) shell.openExternal(pending.page);
+    return { ok: false, msg: String((err && err.message) || err) };
   }
 });
 

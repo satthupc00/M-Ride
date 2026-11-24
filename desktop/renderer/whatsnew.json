@@ -1,6 +1,9 @@
-{ "version": "1.0.1", "date": "2026-11-24",
+{ "version": "1.0.2", "date": "2026-11-24",
   "new": [],
-  "improved": [],
+  "improved": [
+    "Nếu không tự cập nhật được, app mở trang tải bản mới trong trình duyệt"
+  ],
   "fixed": [
+    "Sửa lỗi bấm \"Cập nhật ngay\" báo tải bản cập nhật bị lỗi",
     "Sửa lỗi đường màu theo tốc độ bị đứt đoạn và biến mất khi thu nhỏ bản đồ"
   ] }
