@@ -1,10 +1,10 @@
-{ "version": "1.0.17", "date": "2026-11-24",
+{ "version": "1.0.18", "date": "2026-11-27",
   "new": [
-    "Nút \"Bám xe\" trên bản đồ khi đang ghi: camera chạy mượt theo vị trí của bạn"
+    "Nút \"3D\": bản đồ nghiêng kiểu dẫn đường, nhà cửa dựng khối 3D khi phóng gần",
+    "Bật 3D khi đang bám xe sẽ tự xoay bản đồ theo hướng xe chạy",
+    "Có nút 3D cả khi đang ghi hành trình và khi phát lại"
   ],
   "improved": [
-    "Tự ghi lại đáng tin cậy hơn: vẫn tự bật ghi khi tiếp tục đi xe sau lúc nghỉ hoặc sau khi bấm Dừng (chờ 3 phút)"
+    "Tắt 3D là bản đồ trở lại phẳng, nhẹ như trước"
   ],
-  "fixed": [
-    "Sửa lỗi đường màu theo tốc độ bị đứt đoạn và biến mất khi thu nhỏ bản đồ"
-  ] }
+  "fixed": [] }

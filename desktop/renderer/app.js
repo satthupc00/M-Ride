@@ -18,6 +18,7 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="5" height="16" rx="1"/><rect x="13" y="4" width="5" height="16" rx="1"/></svg>',
   nav: f => `<svg viewBox="0 0 24 24" fill="${f ? '#fff' : 'none'}" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M3 11 22 2 13 21 11 13z"/></svg>`,
+  cube: f => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z" fill="${f ? 'rgba(255,255,255,.35)' : 'none'}"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>`,
   compass: f => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88z" fill="${f ? '#fff' : 'none'}"/></svg>`,
   north: '<svg viewBox="0 0 24 24"><path d="M12 2 16 12H8z" fill="#E5383B"/><path d="M12 22 8 12h8z" fill="#fff"/></svg>',
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -128,6 +129,9 @@ function speedRuns(coords, ss) {
 let map = null, mapReady = false, R = null;    // R: dữ liệu chuyến đang phát
 let t = 0, playing = true, rate = 60, follow = true, rotate = false, camB = 0, toNorth = false, followLock = 0, hidden = false;
 let showElapsed = store.get('mr-elapsed') === '1';
+let mode3d = store.get('mr-3d') === '1';
+const store3d = v => store.set('mr-3d', v ? '1' : '0');
+const paint3d = () => { $('b3dBtn').classList.toggle('on', mode3d); $('b3dBtn').innerHTML = ICON.cube(mode3d) + '3D'; };
 const pointers = new Map();
 let timeMarker, hoverMarker, tlEl, hoverEl, hoverOn = false;
 
@@ -170,6 +174,7 @@ function select(ids, title) {
     map.getSource('start').setData(pt(R.coords[0]));
     map.setBearing(0);
     if (follow) map.jumpTo({center: R.coords[0], zoom: 16.5, padding: camPad()}); else fitAll();
+    apply3d(false); if (mode3d) map.jumpTo({pitch: 60});
   });
 }
 
@@ -189,7 +194,7 @@ function ensureMap() {
   map = new maplibregl.Map({
     container: 'map', attributionControl: {compact: true},
     style: PLAIN ? {version: 8, sources: {}, layers: [{id: 'bg', type: 'background', paint: {'background-color': '#E9E6DF'}}]} : STYLE,
-    center: [106.70, 10.78], zoom: 13, dragRotate: true, pitchWithRotate: false, touchPitch: false, maxPitch: 0,
+    center: [106.70, 10.78], zoom: 13, dragRotate: true, pitchWithRotate: false, touchPitch: false, maxPitch: 70,
   });
   map.scrollZoom.enable({around: 'center'});
   tlEl = document.createElement('div'); tlEl.className = 'tlabel';
@@ -211,9 +216,44 @@ function ensureMap() {
     map.addLayer({id: 'start', type: 'circle', source: 'start', paint: {'circle-radius': 6, 'circle-color': '#1F2126', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
     map.addLayer({id: 'dot-halo', type: 'circle', source: 'dot', paint: {'circle-radius': 16, 'circle-color': '#E5383B', 'circle-opacity': .25}});
     map.addLayer({id: 'dot', type: 'circle', source: 'dot', paint: {'circle-radius': 7.5, 'circle-color': '#E5383B', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
-    timeMarker.setLngLat([106.7, 10.78]).addTo(map);
+    // nhãn giờ vẽ ngay trong bản đồ (cùng lúc với chấm xe) để không bị lệch khi nghiêng 3D
+    map.addLayer({id: 'dot-label', type: 'symbol', source: 'dot', layout: {'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'],
+      'text-size': 13, 'text-offset': [0, -1.9], 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-pitch-alignment': 'viewport'},
+      paint: {'text-color': '#FFFFFF', 'text-halo-color': '#1F2126', 'text-halo-width': 2.4}});
+    styleOk = true;
     mapReady = true; wireMap(); requestAnimationFrame(loop); resolve();
   }));
+}
+
+
+// ---- Chế độ 3D: nghiêng kiểu dẫn đường + địa hình núi đồi + nhà khối 3D (tắt thì về phẳng, không tải thêm gì) ----
+let styleOk = false, zoomGoal = null;
+const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+function ensure3dLayers() {
+  if (map.getSource('dem')) return;
+  map.addSource('dem', {type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14});
+  const layers = map.getStyle().layers;
+  const firstSym = (layers.find(l => l.type === 'symbol') || {}).id;
+  map.addLayer({id: 'hills', type: 'hillshade', source: 'dem', layout: {visibility: 'none'},
+    paint: {'hillshade-exaggeration': .35, 'hillshade-shadow-color': '#4A4034', 'hillshade-highlight-color': '#FFFFFF'}}, firstSym || 'route-casing');
+  const b = layers.find(l => l['source-layer'] === 'building');
+  if (b) map.addLayer({id: 'b3d', type: 'fill-extrusion', source: b.source, 'source-layer': 'building', minzoom: 14, layout: {visibility: 'none'},
+    paint: {'fill-extrusion-color': '#D9D3C8', 'fill-extrusion-opacity': .85,
+      'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0]}}, 'route-casing');
+}
+function apply3d(animate) {
+  if (!map || !map.isStyleLoaded()) return;
+  ensure3dLayers();
+  const vis = mode3d ? 'visible' : 'none';
+  ['hills', 'b3d'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis));
+  try { map.setTerrain(mode3d ? {source: 'dem', exaggeration: 1.3} : null); } catch (e) {}
+  try { if (mode3d) map.setSky({'sky-color': '#9CC9F5', 'horizon-color': '#E8F1F8', 'fog-color': '#F2F4F6', 'sky-horizon-blend': .6, 'horizon-fog-blend': .6, 'fog-ground-blend': .5}); } catch (e) {}
+  if (animate) map.easeTo({pitch: mode3d ? 60 : 0, zoom: mode3d && follow ? Math.max(map.getZoom(), 16) : map.getZoom(), duration: 700});
+}
+function set3d(v) {
+  mode3d = v; store3d(v);
+  if (v && follow) { rotate = true; toNorth = false; camB = map ? map.getBearing() : 0; }
+  paint3d(); apply3d(true);
 }
 
 function nearestIdx(p0) {
@@ -275,15 +315,17 @@ function loop(now) {
     if (playing) { t = Math.min(R.total, t + dt * rate); if (t >= R.total) { playing = false; paint(); } }
     const p = R.pos(t), i = R.idx(t);
     map.getSource('prog').setData(ln([p].concat(R.coords.slice(i + 1))));
-    map.getSource('dot').setData(pt(p));
     if (follow && now > followLock && pointers.size === 0) {
       const o = {center: p, padding: camPad()};
       if (rotate) { const h = R.heading(t); if (h != null) { const dl = ((h - camB + 540) % 360) - 180; camB = (camB + dl * .12 + 360) % 360; } o.bearing = camB; }
       else if (toNorth) { const dl = ((0 - camB + 540) % 360) - 180; camB = Math.abs(dl) < .5 ? 0 : (camB + dl * .15 + 360) % 360; if (camB === 0) toNorth = false; o.bearing = camB; }
+      // nghiêng / phóng gần dần khi bật-tắt 3D (đi chung với camera bám xe để không bị cắt ngang)
+      { const tp = mode3d ? 60 : 0, cp = map.getPitch(); if (Math.abs(tp - cp) > .3) o.pitch = cp + (tp - cp) * .12; }
+      if (zoomGoal != null) { const cz = map.getZoom(); if (Math.abs(zoomGoal - cz) < .02) zoomGoal = null; else o.zoom = cz + (zoomGoal - cz) * .12; }
       map.jumpTo(o);
     }
     const ct = R.clock(t), el = ct - R.start;
-    timeMarker.setLngLat(p); tlEl.textContent = showElapsed ? dur(el) : hm(ct);
+    { const f = pt(p); f.properties.label = showElapsed ? dur(el) : hm(ct); map.getSource('dot').setData(f); }
     $('clock').textContent = showElapsed ? elapsedStr(el) : hms(ct);
     $('spd').textContent = Math.round(R.speed(t));
     const sc = $('scrub'); if (document.activeElement !== sc) sc.value = R.total ? t / R.total * 1000 : 0;
@@ -305,6 +347,7 @@ function wireUi() {
   $('folBtn').onclick = () => setFollow(!follow);
   $('rotBtn').onclick = () => setRotate(!rotate);
   $('northBtn').onclick = goNorth;
+  $('b3dBtn').onclick = () => set3d(!mode3d);
   $('hideBtn').onclick = () => setHidden(true);
   $('restoreBtn').onclick = () => setHidden(false);
   const toggleClock = () => { showElapsed = !showElapsed; store.set('mr-elapsed', showElapsed ? '1' : '0'); paint(); };
@@ -330,11 +373,12 @@ function wireUi() {
     if (e.key === ' ') { e.preventDefault(); $('playBtn').click(); }
     else if (k === 'f') setFollow(!follow); else if (k === 'r') setRotate(!rotate); else if (k === 'n') goNorth();
     else if (k === 'h') setHidden(!hidden);
+    else if (k === 'd') set3d(!mode3d);
     else if (e.key === 'ArrowRight') { e.preventDefault(); seekBy(30); } else if (e.key === 'ArrowLeft') { e.preventDefault(); seekBy(-30); }
     else if (/^[1-5]$/.test(e.key)) { rate = RATES[+e.key - 1]; paint(); }
   });
   window.addEventListener('resize', () => map && map.resize());
-  paint();
+  paint(); paint3d();
 }
 
 /* ---------- phiên bản, What's new, cập nhật ---------- */

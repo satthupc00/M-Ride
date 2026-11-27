@@ -1,9 +1,9 @@
-{ "version": "1.0.2", "date": "2026-11-24",
-  "new": [],
-  "improved": [
-    "Nếu không tự cập nhật được, app mở trang tải bản mới trong trình duyệt"
+{ "version": "1.0.3", "date": "2026-11-27",
+  "new": [
+    "Nút \"3D\" (phím D): bản đồ nghiêng kiểu dẫn đường, núi đồi nổi khối thật, nhà cửa dựng 3D, có bầu trời ở chân trời",
+    "Bật 3D khi đang bám xe sẽ tự xoay bản đồ theo hướng xe chạy"
   ],
-  "fixed": [
-    "Sửa lỗi bấm \"Cập nhật ngay\" báo tải bản cập nhật bị lỗi",
-    "Sửa lỗi đường màu theo tốc độ bị đứt đoạn và biến mất khi thu nhỏ bản đồ"
-  ] }
+  "improved": [
+    "Nhãn giờ trên xe luôn dính sát chấm xe ở mọi góc nhìn"
+  ],
+  "fixed": [] }

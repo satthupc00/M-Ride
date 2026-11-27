@@ -132,6 +132,7 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
         while (true) { delay(1000); tickNow = System.currentTimeMillis() }
     }
     var followLive by remember { mutableStateOf(true) }
+    val map3d by com.mondiro.mride.data.Prefs.map3d.collectAsState()
     LaunchedEffect(rec.recording) { if (rec.recording) followLive = true }
     val liveKmh = if (rec.recording && tickNow - rec.speedAt < 8000) rec.speedKmh else 0f
 
@@ -143,23 +144,20 @@ fun TodayScreen(wide: Boolean, trips: List<Trip>, onReplay: (ReplaySel) -> Unit)
             follow = rec.recording && followLive && live != null,
             followSmooth = true,
             onUserGesture = { followLive = false },
+            mode3d = rec.recording && map3d,
         )
         TopFade()
         if (rec.recording) {
-            val shape = RoundedCornerShape(20.dp)
             Row(
-                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 62.dp, end = 10.dp)
-                    .pressable(shape) { followLive = !followLive }
-                    .background(if (followLive) C.red else C.chrome.copy(alpha = .92f), shape)
-                    .padding(start = 11.dp, end = 13.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 62.dp, end = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                androidx.compose.material3.Icon(
-                    androidx.compose.ui.res.painterResource(if (followLive) R.drawable.ic_navigation_on else R.drawable.ic_navigation),
-                    null, Modifier.size(15.dp), tint = androidx.compose.ui.graphics.Color.White,
-                )
-                Text("Bám xe", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = androidx.compose.ui.graphics.Color.White)
+                LiveChip("3D", if (map3d) R.drawable.ic_cube_on else R.drawable.ic_cube, map3d) {
+                    com.mondiro.mride.data.Prefs.setMap3d(!map3d)
+                }
+                LiveChip(
+                    "Bám xe", if (followLive) R.drawable.ic_navigation_on else R.drawable.ic_navigation, followLive,
+                ) { followLive = !followLive }
             }
         }
         Column(Modifier.fillMaxWidth()) {
@@ -213,3 +211,22 @@ fun TopFade() {
     )
 }
 
+
+
+@Composable
+private fun LiveChip(text: String, icon: Int, on: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
+    Row(
+        Modifier.pressable(shape) { onClick() }
+            .background(if (on) C.red else C.chrome.copy(alpha = .92f), shape)
+            .padding(start = 11.dp, end = 13.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        androidx.compose.material3.Icon(
+            androidx.compose.ui.res.painterResource(icon), null, Modifier.size(15.dp),
+            tint = androidx.compose.ui.graphics.Color.White,
+        )
+        Text(text, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = androidx.compose.ui.graphics.Color.White)
+    }
+}

@@ -1,7 +1,7 @@
 {
   "name": "m-ride-pc",
   "productName": "M Ride",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "M Ride - xem lại hành trình trên máy tính",
   "author": "Mondiro",
   "main": "main.js",

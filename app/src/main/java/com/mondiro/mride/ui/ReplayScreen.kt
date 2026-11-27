@@ -199,6 +199,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
     var northTick by remember { mutableIntStateOf(0) }
     val cam = remember { MapCam() }
     val showElapsed by Prefs.clockElapsed.collectAsState()
+    val map3d by Prefs.map3d.collectAsState()
     val data = loaded?.second
 
     LaunchedEffect(playing, rate, data) {
@@ -258,6 +259,7 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
             cam = cam,
             northTick = northTick,
             onUserGesture = { follow = false },
+            mode3d = map3d,
         )
         if (hideUi) {
             val round = CircleShape
@@ -350,8 +352,14 @@ fun ReplayView(sel: ReplaySel, compact: Boolean, onBack: (() -> Unit)?, onDelete
                     ) {
                         Icon(painterResource(R.drawable.ic_north), "Về hướng Bắc", Modifier.size(22.dp), tint = Color.Unspecified)
                     }
+                    MapChip("3D", if (map3d) R.drawable.ic_cube_on else R.drawable.ic_cube, map3d) {
+                        val on = !map3d
+                        Prefs.setMap3d(on)
+                        // bật 3D khi đang bám xe → xoay theo hướng xe như chế độ dẫn đường
+                        if (on && follow) { rotate = true; northAnim = false }
+                    }
                     MapChip(
-                        "Xoay theo xe",
+                        "Xoay",
                         if (rotate) R.drawable.ic_compass_on else R.drawable.ic_compass, rotate,
                     ) {
                         rotate = !rotate

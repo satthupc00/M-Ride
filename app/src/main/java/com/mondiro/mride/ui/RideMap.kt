@@ -242,6 +242,25 @@ private fun tintDark(s: Style) {
     }
 }
 
+/** Thêm lớp nhà khối 3D (ẩn sẵn), đặt dưới đường đi. Dùng nguồn dữ liệu "building" của kiểu bản đồ. */
+private fun setup3d(s: Style) {
+    if (s.getLayer("mride-3d") != null) return
+    val src = s.layers.firstOrNull { (it as? FillLayer)?.sourceLayer == "building" }?.let { (it as FillLayer).sourceId }
+        ?: s.sources.firstOrNull { it is org.maplibre.android.style.sources.VectorSource }?.id ?: return
+    val layer = org.maplibre.android.style.layers.FillExtrusionLayer("mride-3d", src).apply {
+        sourceLayer = "building"
+        minZoom = 14f
+        setProperties(
+            PropertyFactory.fillExtrusionColor("#D9D3C8"),
+            PropertyFactory.fillExtrusionHeight(Expression.coalesce(Expression.get("render_height"), Expression.literal(8))),
+            PropertyFactory.fillExtrusionBase(Expression.coalesce(Expression.get("render_min_height"), Expression.literal(0))),
+            PropertyFactory.fillExtrusionOpacity(0.85f),
+            PropertyFactory.visibility(Property.NONE),
+        )
+    }
+    try { s.addLayerBelow(layer, "tracks-glow") } catch (e: Exception) { s.addLayer(layer) }
+}
+
 /**
  * @param bottomPadFrac phần chiều cao bản đồ bị bảng phía dưới che, để căn đường đi vào phần còn thấy.
  */
@@ -267,6 +286,7 @@ fun RideMap(
     speeds: List<List<Float>>? = null,
     progressGrey: Boolean = false,
     followSmooth: Boolean = false,
+    mode3d: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val gestureCb by rememberUpdatedState(onUserGesture)
@@ -364,6 +384,7 @@ fun RideMap(
             vietnameseLabels(s)
             if (dark) tintDark(s)
             addRideLayers(s)
+            setup3d(s)
             style = s
         }
         mapView.addOnDidFailLoadingMapListener {
@@ -444,6 +465,20 @@ fun RideMap(
     LaunchedEffect(map, northTick) {
         val m = map ?: return@LaunchedEffect
         if (northTick > 0 && !follow) m.animateCamera(CameraUpdateFactory.bearingTo(0.0), 400)
+    }
+
+    // Chế độ 3D: nghiêng bản đồ kiểu dẫn đường + nhà khối 3D; tắt thì về phẳng cho nhẹ
+    LaunchedEffect(map, style, mode3d) {
+        val m = map ?: return@LaunchedEffect
+        val s = style ?: return@LaunchedEffect
+        s.getLayer("mride-3d")?.setProperties(PropertyFactory.visibility(if (mode3d) Property.VISIBLE else Property.NONE))
+        m.uiSettings.isTiltGesturesEnabled = mode3d
+        m.setMaxPitchPreference(if (mode3d) 65.0 else 0.0)
+        val cur = m.cameraPosition
+        if ((cur.tilt > 1.0) == mode3d) return@LaunchedEffect   // đã đúng trạng thái, không làm gián đoạn camera
+        val target = CameraPosition.Builder(cur).tilt(if (mode3d) 58.0 else 0.0)
+            .zoom(if (mode3d && follow) maxOf(cur.zoom, 16.8) else cur.zoom).build()
+        m.animateCamera(CameraUpdateFactory.newCameraPosition(target), 700)
     }
 
     // Bật bám xe: chừa chỗ cho bảng điều khiển phía dưới rồi phóng to mượt vào xe

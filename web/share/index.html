@@ -112,6 +112,7 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radiu
 <div class="dock">
   <div class="chips">
     <button class="mchip round" id="northBtn" title="Về hướng Bắc" aria-label="Về hướng Bắc"></button>
+    <button class="mchip" id="b3dBtn" title="Bản đồ 3D"></button>
     <button class="mchip" id="rotBtn" title="Xoay bản đồ theo hướng xe"></button>
     <button class="mchip on" id="folBtn" title="Camera chạy theo xe"></button>
   </div>
@@ -143,6 +144,7 @@ const ICON = {
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="5" height="16" rx="1"/><rect x="13" y="4" width="5" height="16" rx="1"/></svg>',
   nav: f => `<svg viewBox="0 0 24 24" fill="${f ? '#fff' : 'none'}" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M3 11 22 2 13 21 11 13z"/></svg>`,
   north: '<svg viewBox="0 0 24 24"><path d="M12 2 16 12H8z" fill="#E5383B"/><path d="M12 22 8 12h8z" fill="#fff"/></svg>',
+  cube: f => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z" fill="${f ? 'rgba(255,255,255,.35)' : 'none'}"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>`,
   compass: f => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88z" fill="${f ? '#fff' : 'none'}"/></svg>`,
 };
 const $ = id => document.getElementById(id);
@@ -244,22 +246,25 @@ function speedRuns(coords, ss) {
 
   // trạng thái phát lại
   let t = 0, playing = true, rate = 60, follow = true, rotate = false, camB = 0, followLockUntil = 0, toNorth = false;
+  let mode3d = false; try { mode3d = localStorage.getItem('mr-3d') === '1'; } catch (e) {}
+  const store3d = v => { try { localStorage.setItem('mr-3d', v ? '1' : '0'); } catch (e) {} };
+  const paint3d = () => { $('b3dBtn').classList.toggle('on', mode3d); $('b3dBtn').innerHTML = ICON.cube(mode3d) + '3D'; };
   const RATES = [1, 10, 30, 60, 120];
   $('rates').innerHTML = RATES.map(r => `<button class="rate${r === rate ? ' on' : ''}" data-r="${r}">${r}×</button>`).join('');
   $('rates').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; rate = +b.dataset.r; [...$('rates').children].forEach(x => x.classList.toggle('on', x === b)); };
   const paintChips = () => {
-    $('folBtn').classList.toggle('on', follow); $('folBtn').innerHTML = ICON.nav(follow) + (follow ? 'Đang bám xe' : 'Bám theo xe');
-    $('rotBtn').classList.toggle('on', rotate); $('rotBtn').innerHTML = ICON.compass(rotate) + 'Xoay theo xe';
+    $('folBtn').classList.toggle('on', follow); $('folBtn').innerHTML = ICON.nav(follow) + 'Bám xe';
+    $('rotBtn').classList.toggle('on', rotate); $('rotBtn').innerHTML = ICON.compass(rotate) + 'Xoay';
     $('playBtn').innerHTML = playing ? ICON.pause : ICON.play;
   };
-  $('northBtn').innerHTML = ICON.north;
+  $('northBtn').innerHTML = ICON.north; paint3d();
   paintChips();
 
   const plain = new URLSearchParams(location.search).get('style') === 'plain';
   const map = new maplibregl.Map({
     container: 'map', attributionControl: {compact: true},
     style: plain ? {version: 8, sources: {}, layers: [{id: 'bg', type: 'background', paint: {'background-color': '#E9E6DF'}}]} : STYLE,
-    center: coords[0], zoom: 14, dragRotate: true, pitchWithRotate: false, touchPitch: false, maxPitch: 0,
+    center: coords[0], zoom: 14, dragRotate: true, pitchWithRotate: false, touchPitch: false, maxPitch: 70,
   });
 
   const bottomPad = () => (window.innerWidth >= 760 ? 40 : document.querySelector('.dock').offsetHeight + 10);
@@ -295,10 +300,15 @@ function speedRuns(coords, ss) {
     map.addLayer({id: 'start', type: 'circle', source: 'start', paint: {'circle-radius': 6, 'circle-color': '#1F2126', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
     map.addLayer({id: 'dot-halo', type: 'circle', source: 'dot', paint: {'circle-radius': 16, 'circle-color': RED, 'circle-opacity': .25}});
     map.addLayer({id: 'dot', type: 'circle', source: 'dot', paint: {'circle-radius': 7.5, 'circle-color': RED, 'circle-stroke-color': '#fff', 'circle-stroke-width': 3}});
-    timeMarker.setLngLat(coords[0]).addTo(map);
+    // nhãn giờ vẽ ngay trong bản đồ (cùng lúc với chấm xe) để không bị lệch khi nghiêng 3D
+    map.addLayer({id: 'dot-label', type: 'symbol', source: 'dot', layout: {'text-field': ['get', 'label'], 'text-font': ['Noto Sans Bold'],
+      'text-size': 13, 'text-offset': [0, -1.9], 'text-allow-overlap': true, 'text-ignore-placement': true, 'text-pitch-alignment': 'viewport'},
+      paint: {'text-color': '#FFFFFF', 'text-halo-color': '#1F2126', 'text-halo-width': 2.4}});
     if (id === 'demo') window.__mr = {map, coords}; // chỉ dùng để kiểm thử với dữ liệu mẫu
+    styleOk = true;
     $('state').hidden = true;
     map.jumpTo({center: coords[0], zoom: 16.5, padding: camPad()});
+    if (mode3d) { apply3d(false); map.jumpTo({pitch: 60}); }
     requestAnimationFrame(loop);
   });
 
@@ -372,6 +382,37 @@ function speedRuns(coords, ss) {
   const paintClockTog = () => { $('ctog').classList.toggle('on', showElapsed); $('ctog').textContent = showElapsed ? '⇄ Đã đi' : '⇄ Giờ thực'; };
   const toggleClock = () => { showElapsed = !showElapsed; try { localStorage.setItem('mr-elapsed', showElapsed ? '1' : '0'); } catch (e) {} paintClockTog(); };
   $('ctog').onclick = toggleClock; $('clock').onclick = toggleClock; paintClockTog();
+
+  // ---- Chế độ 3D: nghiêng kiểu dẫn đường + địa hình núi đồi + nhà khối 3D (tắt thì về phẳng, không tải thêm gì) ----
+  let styleOk = false, zoomGoal = null;
+  const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+  function ensure3dLayers() {
+    if (map.getSource('dem')) return;
+    map.addSource('dem', {type: 'raster-dem', tiles: [DEM], encoding: 'terrarium', tileSize: 256, maxzoom: 14});
+    const layers = map.getStyle().layers;
+    const firstSym = (layers.find(l => l.type === 'symbol') || {}).id;
+    map.addLayer({id: 'hills', type: 'hillshade', source: 'dem', layout: {visibility: 'none'},
+      paint: {'hillshade-exaggeration': .35, 'hillshade-shadow-color': '#4A4034', 'hillshade-highlight-color': '#FFFFFF'}}, firstSym || 'route-casing');
+    const b = layers.find(l => l['source-layer'] === 'building');
+    if (b) map.addLayer({id: 'b3d', type: 'fill-extrusion', source: b.source, 'source-layer': 'building', minzoom: 14, layout: {visibility: 'none'},
+      paint: {'fill-extrusion-color': '#D9D3C8', 'fill-extrusion-opacity': .85,
+        'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0]}}, 'route-casing');
+  }
+  function apply3d(animate) {
+    if (!map || !styleOk) return;
+    ensure3dLayers();
+    const vis = mode3d ? 'visible' : 'none';
+    ['hills', 'b3d'].forEach(id => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', vis));
+    try { map.setTerrain(mode3d ? {source: 'dem', exaggeration: 1.3} : null); } catch (e) {}
+    try { if (mode3d) map.setSky({'sky-color': '#9CC9F5', 'horizon-color': '#E8F1F8', 'fog-color': '#F2F4F6', 'sky-horizon-blend': .6, 'horizon-fog-blend': .6, 'fog-ground-blend': .5}); } catch (e) {}
+    if (animate) map.easeTo({pitch: mode3d ? 60 : 0, zoom: mode3d && follow ? Math.max(map.getZoom(), 16) : map.getZoom(), duration: 700});
+  }
+  function set3d(v) {
+    mode3d = v; store3d(v);
+    if (v && follow) { rotate = true; toNorth = false; camB = map ? map.getBearing() : 0; if (map) zoomGoal = Math.max(map.getZoom(), 16); }
+    paint3d(); paintChips(); apply3d(true);
+  }
+  $('b3dBtn').onclick = () => set3d(!mode3d);
   const scrub = $('scrub');
   scrub.oninput = () => { t = scrub.value / 1000 * total; };
 
@@ -381,15 +422,17 @@ function speedRuns(coords, ss) {
     if (playing) { t = Math.min(total, t + dt * rate); if (t >= total) { playing = false; paintChips(); } }
     const p = pos(t), i = idx(t);
     map.getSource('prog').setData(ln([p].concat(coords.slice(i + 1))));
-    map.getSource('dot').setData(pt(p));
     if (follow && now > followLockUntil && pointers.size === 0) {
       const opts = {center: p, padding: camPad()};
       if (rotate) { const h = heading(t); if (h != null) { const dl = ((h - camB + 540) % 360) - 180; camB = (camB + dl * 0.12 + 360) % 360; } opts.bearing = camB; }
       else if (toNorth) { const dl = ((0 - camB + 540) % 360) - 180; camB = Math.abs(dl) < 0.5 ? 0 : (camB + dl * 0.15 + 360) % 360; if (camB === 0) toNorth = false; opts.bearing = camB; }
+      // nghiêng / phóng gần dần khi bật-tắt 3D (đi chung với camera bám xe để không bị cắt ngang)
+      { const tp = mode3d ? 60 : 0, cp = map.getPitch(); if (Math.abs(tp - cp) > .3) opts.pitch = cp + (tp - cp) * .12; }
+      if (zoomGoal != null) { const cz = map.getZoom(); if (Math.abs(zoomGoal - cz) < .02) zoomGoal = null; else opts.zoom = cz + (zoomGoal - cz) * .12; }
       map.jumpTo(opts);
     }
     const ct = clock(t), el = ct - d.start;
-    timeMarker.setLngLat(p); tlEl.textContent = showElapsed ? elapsedShort(el) : hm(ct);
+    { const f = pt(p); f.properties.label = showElapsed ? elapsedShort(el) : hm(ct); map.getSource('dot').setData(f); }
     $('clock').textContent = showElapsed ? elapsedStr(el) : hms(ct);
     $('spd').textContent = Math.round(speed(t));
     if (document.activeElement !== scrub) scrub.value = total ? t / total * 1000 : 0;
