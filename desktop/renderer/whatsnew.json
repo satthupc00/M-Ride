@@ -1,9 +1,8 @@
-{ "version": "1.0.3", "date": "2026-11-27",
-  "new": [
-    "Nút \"3D\" (phím D): bản đồ nghiêng kiểu dẫn đường, núi đồi nổi khối thật, nhà cửa dựng 3D, có bầu trời ở chân trời",
-    "Bật 3D khi đang bám xe sẽ tự xoay bản đồ theo hướng xe chạy"
-  ],
+{ "version": "1.0.4", "date": "2026-11-28",
+  "new": [],
   "improved": [
-    "Nhãn giờ trên xe luôn dính sát chấm xe ở mọi góc nhìn"
+    "Chế độ 3D nghiêng sâu hơn, núi đồi nổi rõ hơn, bóng đổ sườn núi mịn hơn"
   ],
-  "fixed": [] }
+  "fixed": [
+    "Sửa lỗi bật 3D nhưng không hiện địa hình núi đồi và bóng đổ"
+  ] }
